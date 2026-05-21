@@ -1,0 +1,38 @@
+mask:
+  target_rgb: [102, 255, 102]
+  background_rgb: [0, 0, 0]
+  color_tolerance: 0
+  warn_unexpected_color_fraction: 0.0001
+  morph_open_kernel: 3
+  morph_close_kernel: 5
+  fill_holes: true
+  keep_largest_component: true
+
+geometry:
+  min_area_px: 100
+  min_bbox_width: 10
+  min_bbox_height: 10
+  min_profile_points: 20
+
+profile:
+  smoothing:
+    method: savgol
+    window_length: 31
+    polyorder: 2
+    moving_average_window: 15
+  peaks:
+    prominence_px: 8.0
+    min_distance_px: 20
+
+rules:
+  threshold_peak: 0.12
+  threshold_area: 0.12
+  peak_vote_weight: 0.6
+  area_vote_weight: 0.4
+
+visualization:
+  mask_alpha: 0.35
+
+io:
+  image_extensions: [".jpg", ".jpeg", ".png", ".bmp", ".tif", ".tiff"]
+  mask_extensions: [".png", ".jpg", ".jpeg", ".bmp", ".tif", ".tiff"]
