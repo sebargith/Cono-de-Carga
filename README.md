@@ -72,10 +72,26 @@ frames de video
 - Ajustar los umbrales de clasificación en `analytic_config.yaml`.
 - Mejorar la detección de casos `no_evaluable`.
 - Agregar evaluación cuantitativa con etiquetas manuales por frame.
-- Entrenar un modelo de percepción para segmentar automáticamente la carga visible.
 - Conectar la máscara predicha por el modelo con el mismo analítico geométrico.
 - Comparar resultados usando máscaras manuales vs máscaras automáticas.
 - Evaluar resultados por secuencia de video, no solo por frame.
+
+## Modelo de percepción YOLO-seg
+
+El repositorio incluye un módulo independiente en [`perception/`](perception/) para entrenar, validar y probar un modelo YOLO de segmentación de carga visible.
+
+El flujo implementado es:
+
+```text
+exportaciones CVAT
+→ conversión a dataset YOLO-seg
+→ entrenamiento con GPU mediante Docker
+→ seguimiento experimental en MLflow
+→ validación e inferencia
+→ máscara automática para conectar con el analítico geométrico
+```
+
+Las instrucciones detalladas se encuentran en [`perception/README.md`](perception/README.md).
 
 
 ## Uso Básico
