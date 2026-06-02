@@ -1,0 +1,61 @@
+dataset:
+  name: carga_visible_seg
+  names: ["Carga"]
+  class_id: 0
+  class_rgb: [102, 255, 102]
+  background_rgb: [0, 0, 0]
+  color_tolerance: 0
+  output_dir: data/yolo/carga_visible_seg
+  dataset_yaml: data/yolo/carga_visible_seg/dataset.yaml
+  min_contour_area_px: 80
+  keep_largest_component: true
+  polygon_epsilon_fraction: 0.002
+  max_polygon_points: 200
+  include_empty_labels: false
+  morph_open_kernel: 3
+  morph_close_kernel: 5
+
+split:
+  train: 0.7
+  val: 0.2
+  test: 0.1
+  seed: 42
+
+training:
+  # Camino principal: entrenar desde arquitectura, sin pesos ya entrenados.
+  # Para fine-tuning explicito, cambiar a un .pt y poner pretrained: true.
+  model: yolov8n-seg.yaml
+  pretrained: false
+  epochs: 100
+  batch: 8
+  imgsz: 640
+  device: "0"
+  workers: 4
+  patience: 30
+  optimizer: auto
+  lr0: 0.001
+  weight_decay: 0.0005
+  amp: true
+  freeze:
+  project: runs/train
+  models_dir: models
+  exist_ok: false
+
+augmentation:
+  degrees: 0.0
+  translate: 0.1
+  scale: 0.5
+  shear: 0.0
+  flipud: 0.0
+  fliplr: 0.5
+  mosaic: 0.5
+
+prediction:
+  conf: 0.35
+
+mlflow:
+  enabled: true
+  tracking_uri: file:/workspace/mlruns
+  experiment_name: cono_carga_yolo_seg
+  log_run_dir_artifacts: false
+  log_weight_artifacts: true
