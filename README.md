@@ -24,9 +24,34 @@ A partir de esa máscara, el sistema calcula características geométricas como:
 La salida principal clasifica cada frame como:
 
 - `centrado`
-- `corrido_izquierda`
-- `corrido_derecha`
+- `izquierda`
+- `derecha`
 - `no_evaluable`
+
+Los frames donde la máscara de carga toca cualquier borde de la imagen se descartan del análisis geométrico. Estos casos se conservan en el CSV para mantener trazabilidad, pero quedan marcados como:
+
+```text
+predicted_class = no_evaluable
+is_valid = False
+error_reason = mascara_toca_borde_imagen
+```
+
+El CSV también indica qué bordes fueron alcanzados:
+
+```text
+touches_left_border
+touches_right_border
+touches_top_border
+touches_bottom_border
+is_truncated_by_frame
+```
+
+El margen de descarte se configura en `configs/analytic_config.yaml`:
+
+```yaml
+geometry:
+  border_touch_margin_px: 0
+```
 
 ## Flujo actual
 
