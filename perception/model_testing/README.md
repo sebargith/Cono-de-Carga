@@ -32,3 +32,8 @@ Los resultados quedan en:
 D:\Memoria\Cono\perception\model_testing\outputs\prueba_01\
 ```
 
+El snapshot versionado de la primera prueba se encuentra en:
+
+```text
+D:\Memoria\Cono\perception\model_testing\reference\prueba_01\
+```
