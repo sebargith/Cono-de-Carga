@@ -1,0 +1,13 @@
+data/
+runs/
+models/
+model_testing/
+mlruns/
+.cache/
+.env.mlflow
+__pycache__/
+*.pyc
+*.pt
+*.zip
+tools/cvat_zip_merger/input/
+tools/cvat_zip_merger/output/

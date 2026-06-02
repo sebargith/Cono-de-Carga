@@ -1,0 +1,43 @@
+services:
+  cone-yolo:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: cono-yolo-perception:latest
+    container_name: cono-yolo-perception
+    env_file:
+      - .env.mlflow
+    gpus: all
+    shm_size: "8gb"
+    ipc: host
+    working_dir: /workspace
+    stdin_open: true
+    tty: true
+    environment:
+      NVIDIA_VISIBLE_DEVICES: all
+      NVIDIA_DRIVER_CAPABILITIES: compute,utility
+      YOLO_CONFIG_DIR: /workspace/.cache/ultralytics
+      MPLCONFIGDIR: /workspace/.cache/matplotlib
+    volumes:
+      - ./configs:/workspace/configs
+      - ./scripts:/workspace/scripts
+      - ./src:/workspace/src
+      - ./data:/workspace/data
+      - ./runs:/workspace/runs
+      - ./models:/workspace/models
+      - ./model_testing:/workspace/model_testing
+      - ./mlruns:/workspace/mlruns
+      - ./.cache:/workspace/.cache
+
+  mlflow-ui:
+    image: cono-yolo-perception:latest
+    container_name: cono-yolo-mlflow-ui
+    env_file:
+      - .env.mlflow
+    profiles: ["ui"]
+    working_dir: /workspace
+    command: mlflow ui --backend-store-uri file:/workspace/mlruns --host 0.0.0.0 --port 5000
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./mlruns:/workspace/mlruns
