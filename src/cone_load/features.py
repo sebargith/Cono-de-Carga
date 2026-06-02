@@ -21,6 +21,11 @@ FEATURE_COLUMNS = [
     "bbox_width",
     "bbox_height",
     "bbox_aspect_ratio",
+    "touches_left_border",
+    "touches_right_border",
+    "touches_top_border",
+    "touches_bottom_border",
+    "is_truncated_by_frame",
     "centroid_x",
     "centroid_y",
     "centroid_x_norm",
@@ -69,6 +74,11 @@ def empty_feature_row(
     row["overlay_path"] = ""
     row["unexpected_pixel_count"] = 0
     row["unexpected_color_count"] = 0
+    row["touches_left_border"] = False
+    row["touches_right_border"] = False
+    row["touches_top_border"] = False
+    row["touches_bottom_border"] = False
+    row["is_truncated_by_frame"] = False
     return row
 
 
@@ -103,6 +113,24 @@ def _normalized_x(x: float, bbox_center_x: float, bbox_width: int) -> float:
     if bbox_width <= 0 or not np.isfinite(x):
         return float("nan")
     return float((x - bbox_center_x) / float(bbox_width))
+
+
+def _border_touch_flags(
+    xmin: int,
+    ymin: int,
+    xmax: int,
+    ymax: int,
+    image_width: int,
+    image_height: int,
+    margin_px: int,
+) -> dict[str, bool]:
+    margin_px = max(0, int(margin_px))
+    return {
+        "touches_left_border": xmin <= margin_px,
+        "touches_right_border": xmax >= image_width - 1 - margin_px,
+        "touches_top_border": ymin <= margin_px,
+        "touches_bottom_border": ymax >= image_height - 1 - margin_px,
+    }
 
 
 def analyze_binary_mask(
@@ -148,6 +176,32 @@ def analyze_binary_mask(
     if width < min_width or height < min_height:
         row["error_reason"] = "bbox_demasiado_pequeno"
         return AnalyticResult(row, warnings=warnings or [])
+
+    image_height, image_width = mask.shape[:2]
+    border_margin = int(get_config_value(config, ("geometry", "border_touch_margin_px"), 0))
+    border_flags = _border_touch_flags(
+        xmin=xmin,
+        ymin=ymin,
+        xmax=xmax,
+        ymax=ymax,
+        image_width=image_width,
+        image_height=image_height,
+        margin_px=border_margin,
+    )
+    is_truncated = any(border_flags.values())
+    row.update(border_flags)
+    row["is_truncated_by_frame"] = is_truncated
+    if is_truncated:
+        border_names = [
+            name.removeprefix("touches_").removesuffix("_border")
+            for name, value in border_flags.items()
+            if value
+        ]
+        updated_warnings = list(warnings or [])
+        updated_warnings.append(f"mascara_toca_borde_imagen:{','.join(border_names)}")
+        row["warnings"] = ";".join(updated_warnings)
+        row["error_reason"] = "mascara_toca_borde_imagen"
+        return AnalyticResult(row, warnings=updated_warnings)
 
     bbox_center_x = xmin + (width - 1) / 2.0
     centroid_x, centroid_y = _centroid_from_mask(mask)
