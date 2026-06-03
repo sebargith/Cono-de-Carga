@@ -399,6 +399,68 @@ Las predicciones quedan en:
 D:\Memoria\Cono\perception\model_testing\outputs\
 ```
 
+## 8.1 Generar Mascaras Para El Analitico
+
+Para conectar YOLO-seg con el analitico geometrico, usa el adaptador:
+
+```powershell
+docker compose exec cone-yolo python scripts/predict_to_analytic_masks.py `
+  --model "models/reference/carga_visible_yolov8n-seg_20260527_195509/best.pt" `
+  --images-dir "model_testing/reference/prueba_01/sources" `
+  --masks-dir "model_testing/analytic_masks/prueba_01" `
+  --conf 0.35 `
+  --device 0 `
+  --overwrite
+```
+
+Este script guarda una mascara `.png` por frame con el mismo nombre base:
+
+```text
+model_testing/analytic_masks/prueba_01/
+  Camera_8_..._frame000000.png
+  manifest.csv
+  summary.json
+```
+
+Las mascaras se escriben en el mismo formato RGB que espera el analitico:
+
+```text
+Carga:     [102, 255, 102]
+background:[0, 0, 0]
+```
+
+No guardes estas mascaras como JPG/JPEG, porque la compresion puede alterar el color exacto de la clase y el analitico podria no detectarla.
+
+Por defecto, si YOLO detecta mas de una instancia de carga en el frame, se conserva la de mayor area (`analytic_mask_mode: largest`). Esto evita que detecciones secundarias afecten la forma visible de la carga. Si necesitas unir todas las instancias detectadas, usa:
+
+```powershell
+docker compose exec cone-yolo python scripts/predict_to_analytic_masks.py `
+  --model "models/<run_name>/best.pt" `
+  --images-dir "<carpeta_de_frames>" `
+  --masks-dir "model_testing/analytic_masks/<nombre_prueba>" `
+  --mask-mode merge_all `
+  --overwrite
+```
+
+Luego corre el analitico desde la raiz del proyecto Cono:
+
+```powershell
+cd D:\Memoria\Cono
+
+python scripts/run_simple_analytic.py `
+  --images-dir "perception\model_testing\reference\prueba_01\sources" `
+  --masks-dir "perception\model_testing\analytic_masks\prueba_01" `
+  --output-dir "outputs\pipeline_yolo_masks_prueba_01" `
+  --config "configs\analytic_config.yaml"
+```
+
+El resultado queda en:
+
+```text
+D:\Memoria\Cono\outputs\pipeline_yolo_masks_prueba_01\tables\features.csv
+D:\Memoria\Cono\outputs\pipeline_yolo_masks_prueba_01\overlays\
+```
+
 ## 9. Referencias Versionadas
 
 El repositorio conserva un unico modelo YOLO-seg como referencia inicial:
@@ -432,9 +494,11 @@ Parametros importantes:
 - `training.model`: arquitectura a entrenar, por ejemplo `yolov8n-seg.yaml`.
 - `training.pretrained`: `false` para entrenar desde cero.
 - `training.epochs`, `batch`, `imgsz`, `device`: hiperparametros principales.
+- `prediction.analytic_masks_dir`: carpeta por defecto para mascaras YOLO compatibles con el analitico.
+- `prediction.analytic_mask_mode`: `largest` para conservar la instancia principal o `merge_all` para unir instancias.
 - `mlflow.enabled`: activa/desactiva tracking.
 - `mlflow.tracking_uri`: destino MLflow local o remoto.
 
 ## 11. Conexion Con El Analitico Geometrico
 
-El modelo de percepcion produce mascaras automaticas de la carga visible. En una etapa posterior, esas mascaras pueden reemplazar las mascaras manuales de CVAT y alimentar el analitico geometrico en `src/cone_load`.
+El modelo de percepcion produce mascaras automaticas de la carga visible mediante `scripts/predict_to_analytic_masks.py`. Esas mascaras pueden reemplazar las mascaras manuales de CVAT y alimentar el analitico geometrico en `src/cone_load`.
