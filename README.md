@@ -93,6 +93,22 @@ exportaciones CVAT
 
 Las instrucciones detalladas se encuentran en [`perception/README.md`](perception/README.md).
 
+## Adquisicion de datos desde Nextcloud
+
+El repositorio incluye una herramienta auxiliar en [`frame-hunter-nextcloud/`](frame-hunter-nextcloud/) para descargar videos desde Nextcloud y extraer frames.
+
+Ese modulo cubre solo la etapa de adquisicion:
+
+```text
+Nextcloud
+-> listado y validacion de videos
+-> descarga local
+-> extraccion de frames
+-> datos de entrada para CVAT, YOLO o el analitico
+```
+
+Las credenciales, videos descargados y frames generados quedan fuera de git. Las instrucciones detalladas se encuentran en [`frame-hunter-nextcloud/README.md`](frame-hunter-nextcloud/README.md).
+
 
 ## Uso Básico
 
