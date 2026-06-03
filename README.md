@@ -103,3 +103,13 @@ python Memoria/Cono/scripts/run_simple_analytic.py \
   --output-dir Memoria/Cono/outputs \
   --config Memoria/Cono/configs/analytic_config.yaml
 ```
+
+## Pipeline Desde Videos Locales
+
+Para procesar videos ya descargados en una carpeta local, usar:
+
+```text
+scripts/run_pipeline_from_videos.py
+```
+
+Este flujo extrae frames, genera mascaras automaticas con YOLO-seg y ejecuta el analitico geometrico. La guia esta en [`docs/pipeline_videos_locales.md`](docs/pipeline_videos_locales.md).
