@@ -1,0 +1,8 @@
+.env
+config/config.yaml
+data/videos/
+data/frames/
+venv/
+.venv/
+__pycache__/
+*.py[cod]

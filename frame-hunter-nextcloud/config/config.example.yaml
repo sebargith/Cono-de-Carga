@@ -1,0 +1,24 @@
+# Copiar este archivo como config/config.yaml antes de ejecutar.
+# Las credenciales pueden ir en .env para no dejarlas versionadas.
+
+nextcloud:
+  url: "https://tu-nextcloud"
+  username: "tu_usuario"
+  password: "tu_password"
+  remote_folder: "Data-Analitica/ChancadorCMDIC"
+
+# 0 = extrae todos los frames
+# >0 = extrae 1 frame cada N segundos
+extraction:
+  interval_seconds: 2
+  quality: 85
+  use_ffmpeg: true
+  ffmpeg_qscale: 2
+
+specific_videos:
+  - "Camera_8_20240914_142001"
+  - "Camera_8_20240910_103001.mp4"
+
+local_paths:
+  videos_folder: "data/videos"
+  frames_root: "data/frames"

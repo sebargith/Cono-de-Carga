@@ -1,0 +1,1 @@
+"""Frame Hunter Nextcloud utilities."""
