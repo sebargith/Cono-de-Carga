@@ -52,6 +52,8 @@ augmentation:
 
 prediction:
   conf: 0.35
+  analytic_masks_dir: model_testing/analytic_masks
+  analytic_mask_mode: largest
 
 mlflow:
   enabled: true
