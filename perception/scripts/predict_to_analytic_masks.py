@@ -341,8 +341,14 @@ def main() -> int:
             verbose=False,
         )
 
-        for result in results:
-            image_path = Path(result.path)
+        if len(results) != len(batch):
+            raise RuntimeError(
+                "YOLO devolvio una cantidad inesperada de resultados: "
+                f"{len(results)} para {len(batch)} imagenes."
+            )
+
+        for image_path, result in zip(batch, results):
+            image_path = Path(image_path)
             mask_path = masks_dir / f"{image_path.stem}{output_ext}"
             prediction = result_to_binary_mask(result, class_id=class_id, mask_mode=mask_mode)
             rgb_mask = binary_to_rgb_mask(prediction.mask, class_rgb, background_rgb)
