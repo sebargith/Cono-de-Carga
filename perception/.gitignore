@@ -8,6 +8,8 @@ models/*
 model_testing/models/*
 model_testing/sources/*
 model_testing/outputs/*
+model_testing/analytic_masks/
+model_testing/pipeline_runs/
 !model_testing/models/.gitkeep
 !model_testing/sources/.gitkeep
 !model_testing/outputs/.gitkeep
