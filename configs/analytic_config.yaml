@@ -24,6 +24,7 @@ profile:
   peaks:
     prominence_px: 8.0
     min_distance_px: 20
+    apex_plateau_tolerance_px: 6.0
 
 rules:
   threshold_peak: 0.12
