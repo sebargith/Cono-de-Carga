@@ -93,13 +93,103 @@ def _fallback_find_peaks(signal: np.ndarray, min_distance: int) -> np.ndarray:
     return np.asarray(candidates, dtype=np.int32)
 
 
+def _segments_from_indices(indices: np.ndarray) -> list[tuple[int, int]]:
+    if indices.size == 0:
+        return []
+
+    sorted_idx = np.sort(indices.astype(np.int32))
+    segments: list[tuple[int, int]] = []
+    start = int(sorted_idx[0])
+    prev = int(sorted_idx[0])
+    for value in sorted_idx[1:]:
+        current = int(value)
+        if current == prev + 1:
+            prev = current
+            continue
+        segments.append((start, prev))
+        start = current
+        prev = current
+    segments.append((start, prev))
+    return segments
+
+
+def _find_segment_containing(segments: list[tuple[int, int]], idx: int) -> tuple[int, int] | None:
+    for start, end in segments:
+        if start <= idx <= end:
+            return start, end
+    return None
+
+
+def _center_of_segment(segment: tuple[int, int]) -> int:
+    start, end = segment
+    return int(round((start + end) / 2.0))
+
+
+def _main_peak_index(y_smooth: np.ndarray, plateau_tolerance_px: float) -> int:
+    raw_main_idx = int(np.argmin(y_smooth))
+    tolerance = max(float(plateau_tolerance_px), 0.0)
+    if tolerance <= 0:
+        return raw_main_idx
+
+    min_y = float(np.min(y_smooth))
+    near_apex = np.flatnonzero(y_smooth <= min_y + tolerance)
+    segment = _find_segment_containing(_segments_from_indices(near_apex), raw_main_idx)
+    if segment is None:
+        return raw_main_idx
+    return _center_of_segment(segment)
+
+
+def _collapse_apex_plateau_peaks(
+    y_smooth: np.ndarray,
+    peak_indices: np.ndarray,
+    main_idx: int,
+    plateau_tolerance_px: float,
+) -> np.ndarray:
+    tolerance = max(float(plateau_tolerance_px), 0.0)
+    if peak_indices.size == 0 or tolerance <= 0:
+        return peak_indices.astype(np.int32)
+
+    min_y = float(np.min(y_smooth))
+    near_apex = np.flatnonzero(y_smooth <= min_y + tolerance)
+    segments = _segments_from_indices(near_apex)
+    if not segments:
+        return peak_indices.astype(np.int32)
+
+    collapsed: list[int] = []
+    used_segments: set[tuple[int, int]] = set()
+    for peak_idx in np.sort(peak_indices.astype(np.int32)):
+        segment = _find_segment_containing(segments, int(peak_idx))
+        if segment is None:
+            collapsed.append(int(peak_idx))
+            continue
+        if segment in used_segments:
+            continue
+        used_segments.add(segment)
+        collapsed.append(_center_of_segment(segment))
+
+    main_segment = _find_segment_containing(segments, int(main_idx))
+    if main_segment is not None:
+        main_center = _center_of_segment(main_segment)
+        collapsed = [
+            idx
+            for idx in collapsed
+            if _find_segment_containing([main_segment], int(idx)) is None
+        ]
+        collapsed.append(main_center)
+
+    return np.sort(np.unique(np.asarray(collapsed, dtype=np.int32)))
+
+
 def detect_profile_peaks(y_smooth: np.ndarray, config: dict[str, Any]) -> tuple[int | None, np.ndarray]:
     if y_smooth.size == 0:
         return None, np.array([], dtype=np.int32)
 
-    main_idx = int(np.argmin(y_smooth))
     prominence = float(get_config_value(config, ("profile", "peaks", "prominence_px"), 8.0))
     distance = int(get_config_value(config, ("profile", "peaks", "min_distance_px"), 20))
+    plateau_tolerance = float(
+        get_config_value(config, ("profile", "peaks", "apex_plateau_tolerance_px"), 6.0)
+    )
+    main_idx = _main_peak_index(y_smooth, plateau_tolerance)
     signal = -y_smooth.astype(np.float32)
 
     if scipy_find_peaks is not None:
@@ -113,6 +203,15 @@ def detect_profile_peaks(y_smooth: np.ndarray, config: dict[str, Any]) -> tuple[
         peak_indices = _fallback_find_peaks(signal, max(1, distance))
 
     if peak_indices.size == 0 or not np.any(np.abs(peak_indices - main_idx) <= max(1, distance // 2)):
+        peak_indices = np.unique(np.append(peak_indices, main_idx)).astype(np.int32)
+
+    peak_indices = _collapse_apex_plateau_peaks(
+        y_smooth=y_smooth,
+        peak_indices=peak_indices,
+        main_idx=main_idx,
+        plateau_tolerance_px=plateau_tolerance,
+    )
+    if peak_indices.size == 0 or main_idx not in set(peak_indices.tolist()):
         peak_indices = np.unique(np.append(peak_indices, main_idx)).astype(np.int32)
 
     peak_indices = np.sort(peak_indices)
