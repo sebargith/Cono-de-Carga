@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import csv
 import json
+import math
 import re
 import shutil
 import subprocess
@@ -21,6 +22,41 @@ DEFAULT_MODEL = (
     "carga_visible_yolov8n-seg_20260527_195509/best.pt"
 )
 VIDEO_EXTENSIONS = (".mp4", ".avi", ".mov", ".mkv", ".m4v")
+CLASS_CENTERED = "centrado"
+CLASS_LEFT = "izquierda"
+CLASS_RIGHT = "derecha"
+CLASS_NO_EVALUABLE = "no_evaluable"
+VERDICT_CENTERED = "carga_centrada"
+VERDICT_LEFT = "tendencia_izquierda"
+VERDICT_RIGHT = "tendencia_derecha"
+VERDICT_MIXED = "mixto_o_inestable"
+VERDICT_NO_EVALUABLE = "no_evaluable"
+VIDEO_SUMMARY_COLUMNS = [
+    "video_name",
+    "video_id",
+    "video_path",
+    "total_frames",
+    "analytic_rows",
+    "valid_frames",
+    "invalid_frames",
+    "valid_ratio",
+    "centrado_count",
+    "izquierda_count",
+    "derecha_count",
+    "no_evaluable_count",
+    "centrado_ratio",
+    "izquierda_ratio",
+    "derecha_ratio",
+    "median_peak_x_norm",
+    "mean_peak_x_norm",
+    "median_area_symmetry",
+    "mean_area_symmetry",
+    "mean_profile_roughness",
+    "mean_num_peaks",
+    "final_verdict",
+    "confidence",
+    "verdict_reason",
+]
 
 
 def parse_args() -> argparse.Namespace:
@@ -100,6 +136,18 @@ def parse_args() -> argparse.Namespace:
         "--overwrite",
         action="store_true",
         help="Borra la corrida previa con el mismo run-name si existe.",
+    )
+    parser.add_argument(
+        "--video-min-valid-ratio",
+        type=float,
+        default=0.5,
+        help="Minima fraccion de frames validos para emitir veredicto por video.",
+    )
+    parser.add_argument(
+        "--video-majority-ratio",
+        type=float,
+        default=0.6,
+        help="Fraccion minima de frames validos que deben apoyar una clase dominante.",
     )
     return parser.parse_args()
 
@@ -195,6 +243,29 @@ def write_manifest_csv(path: Path, rows: list[dict[str, Any]], fieldnames: list[
         writer = csv.DictWriter(f, fieldnames=fieldnames)
         writer.writeheader()
         writer.writerows(rows)
+
+
+def load_yaml_config(path: Path) -> dict[str, Any]:
+    try:
+        import yaml
+    except ImportError:
+        return {}
+
+    try:
+        with path.open("r", encoding="utf-8") as f:
+            data = yaml.safe_load(f) or {}
+    except Exception:
+        return {}
+    return data if isinstance(data, dict) else {}
+
+
+def nested_value(config: dict[str, Any], keys: tuple[str, ...], default: Any) -> Any:
+    current: Any = config
+    for key in keys:
+        if not isinstance(current, dict) or key not in current:
+            return default
+        current = current[key]
+    return current
 
 
 def extract_frames(
@@ -393,6 +464,223 @@ def read_csv_rows(path: Path) -> list[dict[str, str]]:
         return list(csv.DictReader(f))
 
 
+def bool_from_csv(value: str) -> bool:
+    return str(value).strip().lower() in {"true", "1", "yes", "si", "sí"}
+
+
+def finite_float_from_csv(value: Any) -> float | None:
+    try:
+        number = float(str(value).strip())
+    except (TypeError, ValueError):
+        return None
+    if not math.isfinite(number):
+        return None
+    return number
+
+
+def mean_or_nan(values: list[float]) -> float:
+    if not values:
+        return float("nan")
+    return float(sum(values) / len(values))
+
+
+def median_or_nan(values: list[float]) -> float:
+    if not values:
+        return float("nan")
+    ordered = sorted(values)
+    n = len(ordered)
+    middle = n // 2
+    if n % 2:
+        return float(ordered[middle])
+    return float((ordered[middle - 1] + ordered[middle]) / 2.0)
+
+
+def fmt_float(value: float) -> str:
+    if not math.isfinite(value):
+        return "nan"
+    return f"{value:.6f}"
+
+
+def ratio(count: int, denom: int) -> float:
+    return float(count / denom) if denom > 0 else 0.0
+
+
+def decide_video_verdict(
+    valid_ratio: float,
+    centered_ratio: float,
+    left_ratio: float,
+    right_ratio: float,
+    median_peak_x_norm: float,
+    median_area_symmetry: float,
+    min_valid_ratio: float,
+    majority_ratio: float,
+    threshold_peak: float,
+    threshold_area: float,
+) -> tuple[str, float, str]:
+    class_confidence = max(centered_ratio, left_ratio, right_ratio)
+    if valid_ratio < min_valid_ratio:
+        return VERDICT_NO_EVALUABLE, valid_ratio, "valid_ratio_bajo"
+
+    if left_ratio >= majority_ratio:
+        return VERDICT_LEFT, left_ratio, "mayoria_frames_izquierda"
+    if right_ratio >= majority_ratio:
+        return VERDICT_RIGHT, right_ratio, "mayoria_frames_derecha"
+    if centered_ratio >= majority_ratio:
+        return VERDICT_CENTERED, centered_ratio, "mayoria_frames_centrado"
+
+    peak_ok = math.isfinite(median_peak_x_norm)
+    area_ok = math.isfinite(median_area_symmetry)
+    if peak_ok and area_ok:
+        if (
+            abs(median_peak_x_norm) < threshold_peak
+            and abs(median_area_symmetry) < threshold_area
+        ):
+            return VERDICT_CENTERED, class_confidence, "medianas_geometricas_centradas"
+        if median_peak_x_norm < -threshold_peak or median_area_symmetry < -threshold_area:
+            return VERDICT_LEFT, class_confidence, "medianas_geometricas_izquierda"
+        if median_peak_x_norm > threshold_peak or median_area_symmetry > threshold_area:
+            return VERDICT_RIGHT, class_confidence, "medianas_geometricas_derecha"
+
+    return VERDICT_MIXED, class_confidence, "sin_mayoria_clara"
+
+
+def build_video_summary(
+    frame_manifest_rows: list[dict[str, Any]],
+    video_manifest_rows: list[dict[str, Any]],
+    feature_rows: list[dict[str, str]],
+    analytic_config: dict[str, Any],
+    min_valid_ratio: float,
+    majority_ratio: float,
+) -> list[dict[str, Any]]:
+    frame_to_video = {
+        str(row["frame_name"]): {
+            "video_name": str(row["video_name"]),
+            "video_id": str(row["video_id"]),
+            "video_path": str(row["video_path"]),
+        }
+        for row in frame_manifest_rows
+    }
+    by_video: dict[str, dict[str, Any]] = {}
+    for video_row in video_manifest_rows:
+        current_video_id = str(video_row["video_id"])
+        by_video[current_video_id] = {
+            "video_name": str(video_row["video_name"]),
+            "video_id": current_video_id,
+            "video_path": str(video_row["video_path"]),
+            "total_frames": int(video_row.get("saved_frames") or 0),
+            "features": [],
+        }
+
+    for feature in feature_rows:
+        frame_name = str(feature.get("image_name", ""))
+        frame_info = frame_to_video.get(frame_name)
+        if frame_info is None:
+            continue
+        current_video_id = frame_info["video_id"]
+        if current_video_id not in by_video:
+            by_video[current_video_id] = {
+                "video_name": frame_info["video_name"],
+                "video_id": current_video_id,
+                "video_path": frame_info["video_path"],
+                "total_frames": 0,
+                "features": [],
+            }
+        by_video[current_video_id]["features"].append(feature)
+
+    threshold_peak = float(nested_value(analytic_config, ("rules", "threshold_peak"), 0.12))
+    threshold_area = float(nested_value(analytic_config, ("rules", "threshold_area"), 0.12))
+    rows: list[dict[str, Any]] = []
+    for video_id_key in sorted(by_video):
+        item = by_video[video_id_key]
+        features = list(item["features"])
+        total_frames = int(item["total_frames"])
+        analytic_rows = len(features)
+        valid_features = [row for row in features if bool_from_csv(row.get("is_valid", ""))]
+        valid_frames = len(valid_features)
+        invalid_frames = max(total_frames - valid_frames, 0)
+        valid_ratio = ratio(valid_frames, total_frames)
+        class_counts = Counter(row.get("predicted_class", "") for row in features)
+        centered_count = int(class_counts.get(CLASS_CENTERED, 0))
+        left_count = int(class_counts.get(CLASS_LEFT, 0))
+        right_count = int(class_counts.get(CLASS_RIGHT, 0))
+        no_evaluable_count = int(class_counts.get(CLASS_NO_EVALUABLE, 0))
+        centered_ratio = ratio(centered_count, valid_frames)
+        left_ratio = ratio(left_count, valid_frames)
+        right_ratio = ratio(right_count, valid_frames)
+
+        peak_values = [
+            value
+            for value in (finite_float_from_csv(row.get("peak_x_norm")) for row in valid_features)
+            if value is not None
+        ]
+        area_values = [
+            value
+            for value in (finite_float_from_csv(row.get("area_symmetry")) for row in valid_features)
+            if value is not None
+        ]
+        roughness_values = [
+            value
+            for value in (
+                finite_float_from_csv(row.get("profile_roughness")) for row in valid_features
+            )
+            if value is not None
+        ]
+        num_peak_values = [
+            value
+            for value in (finite_float_from_csv(row.get("num_peaks")) for row in valid_features)
+            if value is not None
+        ]
+        median_peak = median_or_nan(peak_values)
+        mean_peak = mean_or_nan(peak_values)
+        median_area = median_or_nan(area_values)
+        mean_area = mean_or_nan(area_values)
+        mean_roughness = mean_or_nan(roughness_values)
+        mean_num_peaks = mean_or_nan(num_peak_values)
+        final_verdict, confidence, verdict_reason = decide_video_verdict(
+            valid_ratio=valid_ratio,
+            centered_ratio=centered_ratio,
+            left_ratio=left_ratio,
+            right_ratio=right_ratio,
+            median_peak_x_norm=median_peak,
+            median_area_symmetry=median_area,
+            min_valid_ratio=min_valid_ratio,
+            majority_ratio=majority_ratio,
+            threshold_peak=threshold_peak,
+            threshold_area=threshold_area,
+        )
+
+        rows.append(
+            {
+                "video_name": item["video_name"],
+                "video_id": item["video_id"],
+                "video_path": item["video_path"],
+                "total_frames": total_frames,
+                "analytic_rows": analytic_rows,
+                "valid_frames": valid_frames,
+                "invalid_frames": invalid_frames,
+                "valid_ratio": fmt_float(valid_ratio),
+                "centrado_count": centered_count,
+                "izquierda_count": left_count,
+                "derecha_count": right_count,
+                "no_evaluable_count": no_evaluable_count,
+                "centrado_ratio": fmt_float(centered_ratio),
+                "izquierda_ratio": fmt_float(left_ratio),
+                "derecha_ratio": fmt_float(right_ratio),
+                "median_peak_x_norm": fmt_float(median_peak),
+                "mean_peak_x_norm": fmt_float(mean_peak),
+                "median_area_symmetry": fmt_float(median_area),
+                "mean_area_symmetry": fmt_float(mean_area),
+                "mean_profile_roughness": fmt_float(mean_roughness),
+                "mean_num_peaks": fmt_float(mean_num_peaks),
+                "final_verdict": final_verdict,
+                "confidence": fmt_float(confidence),
+                "verdict_reason": verdict_reason,
+            }
+        )
+
+    return rows
+
+
 def summarize_features(features_csv: Path) -> dict[str, Any]:
     rows = read_csv_rows(features_csv)
     class_counts = Counter(row.get("predicted_class", "") for row in rows)
@@ -506,6 +794,18 @@ def main() -> int:
     )
 
     features_csv = analytic_dir / "tables" / "features.csv"
+    feature_rows = read_csv_rows(features_csv)
+    video_summary_rows = build_video_summary(
+        frame_manifest_rows=frame_rows,
+        video_manifest_rows=video_rows,
+        feature_rows=feature_rows,
+        analytic_config=load_yaml_config(analytic_config),
+        min_valid_ratio=max(min(float(args.video_min_valid_ratio), 1.0), 0.0),
+        majority_ratio=max(min(float(args.video_majority_ratio), 1.0), 0.0),
+    )
+    video_summary_csv = output_dir / "video_summary.csv"
+    write_manifest_csv(video_summary_csv, video_summary_rows, VIDEO_SUMMARY_COLUMNS)
+    verdict_counts = Counter(row["final_verdict"] for row in video_summary_rows)
     summary = {
         "run_name": run_name,
         "videos_dir": str(videos_dir),
@@ -522,6 +822,8 @@ def main() -> int:
         "mask_mode": args.mask_mode,
         "interval_seconds": max(float(args.interval_seconds), 0.0),
         "features_csv": str(features_csv),
+        "video_summary_csv": str(video_summary_csv),
+        "video_verdict_counts": dict(verdict_counts),
         "feature_summary": summarize_features(features_csv),
     }
     summary_path = output_dir / "pipeline_summary.json"
@@ -532,6 +834,7 @@ def main() -> int:
     print(f"Frames: {frames_dir}")
     print(f"Mascaras YOLO: {masks_dir}")
     print(f"Resultados analitico: {analytic_dir}")
+    print(f"Veredictos por video: {video_summary_csv}")
     print(f"Resumen: {summary_path}")
     return 0
 
