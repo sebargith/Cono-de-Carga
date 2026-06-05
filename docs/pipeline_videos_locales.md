@@ -89,8 +89,51 @@ D:\Memoria\Cono\outputs\pipeline_runs\prueba_videos_01\
     frames.csv
     yolo_manifest.csv
     yolo_summary.json
+  video_summary.csv
   pipeline_summary.json
 ```
+
+## Veredicto Por Video
+
+El pipeline genera un resumen por video en:
+
+```text
+D:\Memoria\Cono\outputs\pipeline_runs\<run_name>\video_summary.csv
+```
+
+Cada fila resume los frames asociados a un video:
+
+```text
+video_name
+total_frames
+valid_frames
+valid_ratio
+centrado_ratio
+izquierda_ratio
+derecha_ratio
+median_peak_x_norm
+median_area_symmetry
+final_verdict
+confidence
+verdict_reason
+```
+
+Veredictos posibles:
+
+```text
+carga_centrada
+tendencia_izquierda
+tendencia_derecha
+mixto_o_inestable
+no_evaluable
+```
+
+Regla inicial:
+
+- si hay pocos frames evaluables, el video queda `no_evaluable`;
+- si una clase domina al menos el umbral configurado, se usa esa tendencia;
+- si no hay mayoria clara, se usan las medianas de `peak_x_norm` y `area_symmetry`;
+- si aun asi no hay una tendencia clara, queda `mixto_o_inestable`.
 
 ## Parametros Utiles
 
@@ -101,6 +144,8 @@ D:\Memoria\Cono\outputs\pipeline_runs\prueba_videos_01\
 - `--recursive`: busca videos en subcarpetas.
 - `--mask-mode largest`: conserva la instancia principal detectada por YOLO.
 - `--mask-mode merge_all`: une todas las instancias detectadas por YOLO.
+- `--video-min-valid-ratio 0.5`: minima fraccion de frames validos para emitir veredicto.
+- `--video-majority-ratio 0.6`: fraccion minima de frames validos que deben apoyar una clase dominante.
 
 ## Nota
 
