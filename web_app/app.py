@@ -12,7 +12,7 @@ WEB_DIR = Path(__file__).resolve().parent
 if str(WEB_DIR) not in sys.path:
     sys.path.insert(0, str(WEB_DIR))
 
-from src.pipeline_runner import PipelineParams, relative_to_project, run_pipeline
+from src.pipeline_runner import PipelineParams, relative_to_project, run_pipeline_stream
 from src.run_storage import (
     count_files,
     default_run_name,
@@ -135,12 +135,23 @@ def numeric_value(value: object, default: float = 0.0) -> float:
     return number
 
 
-def render_console(log: str) -> None:
-    st.markdown("Consola")
-    st.markdown(
-        f'<div class="console-box">{html.escape(log)}</div>',
-        unsafe_allow_html=True,
-    )
+def last_log_line(log: str) -> str:
+    lines = [line.strip() for line in log.splitlines() if line.strip()]
+    return lines[-1] if lines else ""
+
+
+def render_console(log: str, target: object | None = None) -> None:
+    root = target or st
+    escaped_log = html.escape(log)
+    escaped_last = html.escape(last_log_line(log))
+    with root.container():
+        st.markdown("Consola")
+        if escaped_last:
+            st.caption(f"Ultima salida: {escaped_last}")
+        st.markdown(
+            f'<div class="console-box">{escaped_log}</div>',
+            unsafe_allow_html=True,
+        )
 
 
 def video_label(row: pd.Series) -> str:
@@ -320,18 +331,27 @@ if run_clicked:
         video_min_valid_ratio=float(video_min_valid_ratio),
         video_majority_ratio=float(video_majority_ratio),
     )
-    with st.spinner("Ejecutando pipeline"):
-        return_code, log = run_pipeline(paths, params)
+    console_slot = st.empty()
+    status_slot = st.empty()
+    status_slot.info("Ejecutando pipeline...")
+
+    def update_console(log_text: str) -> None:
+        st.session_state["last_log"] = log_text
+        st.session_state["last_log_run"] = paths.run_name
+        render_console(log_text, console_slot)
+
+    return_code, log = run_pipeline_stream(paths, params, update_console)
 
     st.session_state["last_log"] = log
     st.session_state["last_log_run"] = paths.run_name
     selected_run = paths.run_name
 
     if return_code != 0:
-        render_console(log)
+        status_slot.empty()
         st.error(f"Pipeline fallo con codigo {return_code}.")
         st.stop()
 
+    status_slot.empty()
     st.session_state["last_status"] = f"Pipeline terminado. Videos cargados: {saved_count}."
 
 
