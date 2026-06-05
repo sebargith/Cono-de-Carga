@@ -24,6 +24,7 @@ class RunPaths:
     analytic_dir: Path
     overlays_dir: Path
     features_csv: Path
+    frame_manifest_csv: Path
     video_summary_csv: Path
     pipeline_summary_json: Path
 
@@ -77,6 +78,7 @@ def paths_for_run(run_name: str) -> RunPaths:
         analytic_dir=analytic_dir,
         overlays_dir=analytic_dir / "overlays",
         features_csv=analytic_dir / "tables" / "features.csv",
+        frame_manifest_csv=result_dir / "manifests" / "frames.csv",
         video_summary_csv=result_dir / "video_summary.csv",
         pipeline_summary_json=result_dir / "pipeline_summary.json",
     )
