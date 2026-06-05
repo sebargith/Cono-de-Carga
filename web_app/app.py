@@ -55,18 +55,6 @@ VERDICT_LABELS = {
     "no_evaluable": "No evaluable",
 }
 
-VERDICT_REASONS = {
-    "valid_ratio_bajo": "Se descarto el veredicto porque la fraccion de frames validos fue baja.",
-    "mayoria_frames_izquierda": "La mayoria de frames validos quedo clasificada con tendencia izquierda.",
-    "mayoria_frames_derecha": "La mayoria de frames validos quedo clasificada con tendencia derecha.",
-    "mayoria_frames_centrado": "La mayoria de frames validos quedo clasificada como centrada.",
-    "medianas_geometricas_centradas": "Las medianas de pico relativo y simetria interna quedaron dentro del rango centrado.",
-    "medianas_geometricas_izquierda": "Las medianas de pico relativo o simetria interna indican desplazamiento visual hacia la izquierda.",
-    "medianas_geometricas_derecha": "Las medianas de pico relativo o simetria interna indican desplazamiento visual hacia la derecha.",
-    "sin_mayoria_clara": "No hubo una mayoria clara entre los frames validos.",
-}
-
-
 st.set_page_config(
     page_title="Cono de Carga - Pipeline",
     layout="wide",
@@ -86,12 +74,6 @@ st.markdown(
         font-size: 0.82rem;
         line-height: 1.45;
         white-space: pre;
-    }
-    .verdict-box {
-        border: 1px solid rgba(250, 250, 250, 0.12);
-        border-radius: 8px;
-        padding: 1rem;
-        background: rgba(255, 255, 255, 0.03);
     }
     .muted-small {
         color: rgba(250, 250, 250, 0.65);
@@ -234,9 +216,7 @@ def render_verdict(video: pd.Series | None) -> None:
         return
 
     final_verdict = text_value(video.get("final_verdict"), "sin_veredicto")
-    reason = text_value(video.get("verdict_reason"), "sin_motivo")
     label = VERDICT_LABELS.get(final_verdict, final_verdict)
-    reason_text = VERDICT_REASONS.get(reason, reason)
     confidence = numeric_value(video.get("confidence"))
     valid_ratio = numeric_value(video.get("valid_ratio"))
 
@@ -245,13 +225,6 @@ def render_verdict(video: pd.Series | None) -> None:
     cols[1].metric("confianza", f"{confidence:.2f}")
     cols[2].metric("frames validos", text_value(video.get("valid_frames"), "0"))
     cols[3].metric("ratio valido", f"{valid_ratio:.2f}")
-
-    st.markdown(
-        "<div class=\"verdict-box\">"
-        f"<strong>Por que se tomo:</strong><br>{html.escape(reason_text)}"
-        "</div>",
-        unsafe_allow_html=True,
-    )
 
 
 def render_statistics(video: pd.Series | None, features_df: pd.DataFrame) -> None:
