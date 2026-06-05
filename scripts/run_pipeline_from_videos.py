@@ -76,16 +76,17 @@ def parse_args() -> argparse.Namespace:
         "--work-dir",
         default=None,
         help=(
-            "Carpeta de trabajo visible para Docker. Debe quedar dentro de "
-            "perception/model_testing/pipeline_runs/."
+            "Carpeta de trabajo visible para Docker. Por defecto queda dentro "
+            "de perception/model_testing/pipeline_runs/. La web app puede usar "
+            "web_app/outputs/runs/."
         ),
     )
     parser.add_argument(
         "--output-dir",
         default=None,
         help=(
-            "Carpeta final de resultados. Debe quedar dentro de "
-            "outputs/pipeline_runs/."
+            "Carpeta final de resultados. Por defecto queda dentro de "
+            "outputs/pipeline_runs/. La web app puede usar web_app/outputs/runs/."
         ),
     )
     parser.add_argument(
@@ -183,11 +184,18 @@ def require_file(path: Path, name: str) -> Path:
     return path
 
 
-def prepare_clean_dir(path: Path, allowed_base: Path, overwrite: bool, label: str) -> Path:
+def prepare_clean_dir(
+    path: Path,
+    allowed_bases: list[Path],
+    overwrite: bool,
+    label: str,
+) -> Path:
     path = path.resolve()
-    allowed_base = allowed_base.resolve()
-    if not is_relative_to(path, allowed_base) or path == allowed_base:
-        raise ValueError(f"{label} debe quedar dentro de {allowed_base}: {path}")
+    resolved_bases = [base.resolve() for base in allowed_bases]
+    is_allowed = any(is_relative_to(path, base) and path != base for base in resolved_bases)
+    if not is_allowed:
+        bases = ", ".join(str(base) for base in resolved_bases)
+        raise ValueError(f"{label} debe quedar dentro de una de estas rutas: {bases}. Ruta: {path}")
 
     if path.exists() and not path.is_dir():
         raise NotADirectoryError(f"{label} existe pero no es un directorio: {path}")
@@ -381,13 +389,20 @@ def perception_host_path(value: str | Path, perception_dir: Path) -> Path:
     )
 
 
-def to_container_path(host_path: Path, perception_dir: Path) -> str:
+def to_container_path(host_path: Path, perception_dir: Path, web_app_dir: Path | None = None) -> str:
     resolved = host_path.resolve()
     perception_root = perception_dir.resolve()
-    if not is_relative_to(resolved, perception_root):
-        raise ValueError(f"La ruta no esta montada en Docker: {resolved}")
-    rel = resolved.relative_to(perception_root)
-    return "/workspace/" + rel.as_posix()
+    mount_points: list[tuple[Path, str]] = [(perception_root, "/workspace")]
+    if web_app_dir is not None:
+        mount_points.append((web_app_dir.resolve(), "/workspace/web_app"))
+
+    for host_root, container_root in mount_points:
+        if is_relative_to(resolved, host_root):
+            rel = resolved.relative_to(host_root)
+            suffix = rel.as_posix()
+            return container_root if not suffix else f"{container_root}/{suffix}"
+
+    raise ValueError(f"La ruta no esta montada en Docker: {resolved}")
 
 
 def run_command(command: list[str], cwd: Path, label: str) -> None:
@@ -400,6 +415,7 @@ def run_command(command: list[str], cwd: Path, label: str) -> None:
 
 def run_yolo_masks(
     perception_dir: Path,
+    web_app_dir: Path | None,
     docker_service: str,
     yolo_model: Path,
     frames_dir: Path,
@@ -422,11 +438,11 @@ def run_yolo_masks(
         "python",
         "scripts/predict_to_analytic_masks.py",
         "--model",
-        to_container_path(yolo_model, perception_dir),
+        to_container_path(yolo_model, perception_dir, web_app_dir),
         "--images-dir",
-        to_container_path(frames_dir, perception_dir),
+        to_container_path(frames_dir, perception_dir, web_app_dir),
         "--masks-dir",
-        to_container_path(masks_dir, perception_dir),
+        to_container_path(masks_dir, perception_dir, web_app_dir),
         "--conf",
         str(conf),
         "--device",
@@ -465,7 +481,7 @@ def read_csv_rows(path: Path) -> list[dict[str, str]]:
 
 
 def bool_from_csv(value: str) -> bool:
-    return str(value).strip().lower() in {"true", "1", "yes", "si", "sí"}
+    return str(value).strip().lower() in {"true", "1", "yes", "si"}
 
 
 def finite_float_from_csv(value: Any) -> float | None:
@@ -717,11 +733,23 @@ def main() -> int:
 
     work_base = perception_dir / "model_testing" / "pipeline_runs"
     output_base = ROOT / "outputs" / "pipeline_runs"
+    web_app_base = ROOT / "web_app"
+    web_app_runs_base = web_app_base / "outputs" / "runs"
     work_dir = resolve_repo_path(args.work_dir) if args.work_dir else work_base / run_name
     output_dir = resolve_repo_path(args.output_dir) if args.output_dir else output_base / run_name
 
-    work_dir = prepare_clean_dir(work_dir, work_base, args.overwrite, "work-dir")
-    output_dir = prepare_clean_dir(output_dir, output_base, args.overwrite, "output-dir")
+    work_dir = prepare_clean_dir(
+        work_dir,
+        [work_base, web_app_runs_base],
+        args.overwrite,
+        "work-dir",
+    )
+    output_dir = prepare_clean_dir(
+        output_dir,
+        [output_base, web_app_runs_base],
+        args.overwrite,
+        "output-dir",
+    )
 
     frames_dir = work_dir / "frames"
     masks_dir = work_dir / "yolo_masks"
@@ -772,6 +800,7 @@ def main() -> int:
 
     run_yolo_masks(
         perception_dir=perception_dir,
+        web_app_dir=web_app_base,
         docker_service=args.docker_service,
         yolo_model=yolo_model,
         frames_dir=frames_dir,
