@@ -265,8 +265,6 @@ if "last_log" not in st.session_state:
     st.session_state["last_log"] = ""
 if "last_log_run" not in st.session_state:
     st.session_state["last_log_run"] = ""
-if "last_status" not in st.session_state:
-    st.session_state["last_status"] = ""
 
 
 st.title("Cono de Carga")
@@ -351,8 +349,8 @@ if run_clicked:
         st.error(f"Pipeline fallo con codigo {return_code}.")
         st.stop()
 
-    status_slot.empty()
-    st.session_state["last_status"] = f"Pipeline terminado. Videos cargados: {saved_count}."
+    status_message = f"Pipeline terminado. Videos cargados: {saved_count}."
+    status_slot.success(status_message)
 
 
 if not selected_run:
@@ -392,11 +390,6 @@ active_overlays = filter_overlays(all_overlays, frame_names)
 
 st.header(video_title)
 st.caption(f"Corrida: {selected_run}")
-
-if st.session_state["last_log_run"] == selected_run and st.session_state["last_log"]:
-    render_console(st.session_state["last_log"])
-    if st.session_state["last_status"]:
-        st.success(st.session_state["last_status"])
 
 st.subheader("Overlays")
 if active_overlays:
