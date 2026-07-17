@@ -27,8 +27,8 @@ profile:
     apex_plateau_tolerance_px: 6.0
 
 rules:
-  threshold_peak: 0.08
-  threshold_area: 0.09
+  threshold_peak: 0.06
+  threshold_area: 0.07
   peak_vote_weight: 0.6
   area_vote_weight: 0.4
 
