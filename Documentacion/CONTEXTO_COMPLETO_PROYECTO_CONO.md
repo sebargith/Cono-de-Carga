@@ -38,6 +38,58 @@ feat-prueba-tecnica
 
 No se debe asumir que todos los cambios de ramas funcionales ya están integrados en `main`. Antes de trabajar sobre Git, revisar ramas, historial y estado de la copia de sincronización.
 
+### 1.1 Instituciones y contexto industrial
+
+El proyecto se desarrolla con la participación o dentro del contexto de tres organizaciones principales, cuyos roles deben distinguirse:
+
+#### Universidad de Concepción - Facultad de Ingeniería
+
+La **Universidad de Concepción (UdeC)** es la institución académica donde se desarrolla esta Memoria de Título, específicamente en su **Facultad de Ingeniería**. La UdeC fue fundada en 1919 y se define institucionalmente como una universidad laica y pluralista, orientada a la formación de personas y a la generación, preservación y transferencia de conocimiento. En este proyecto aporta el marco académico, metodológico y de evaluación propio de una Memoria de Título.
+
+La Facultad de Ingeniería constituye la unidad académica desde la cual se aborda el problema mediante visión computacional, procesamiento de imágenes, aprendizaje automático y desarrollo de software aplicado. El trabajo se alinea con su actividad de investigación, innovación y transferencia de conocimiento aplicado hacia sectores estratégicos.
+
+Fuentes oficiales:
+
+- [Sobre la Universidad de Concepción](https://www.udec.cl/sobre-la-udec/)
+- [Facultad de Ingeniería de la Universidad de Concepción](https://www.udec.cl/facultades/facultad-de-ingenieria/)
+- [Investigación, innovación y transferencia en Ingeniería UdeC](https://fi.udec.cl/conocimiento-que-se-protege-innovacion-que-se-proyecta-ingenieria-udec/)
+
+#### PSINet
+
+**PSINet** es la empresa colaboradora y contraparte técnica del proyecto. Su actividad se concentra en soluciones e integraciones tecnológicas para minería. Según su información institucional, el Grupo PSINet opera desde 2001 y trabaja en infraestructura tecnológica, redes industriales, servicios IT y OT, monitoreo, control y analítica, además de telecomunicaciones y automatización minera.
+
+En el proyecto Cono de Carga, PSINet vincula la investigación con la aplicación industrial: está asociada al acceso y contexto de los datos, a modelos de percepción desarrollados previamente y a la orientación práctica de la solución. El modelo denominado `modelo Psinet`, descrito más adelante, es actualmente el que ha obtenido el mejor resultado en la evaluación técnica local.
+
+Fuente oficial:
+
+- [Quiénes somos - PSINet](https://psinet.cl/nosotros/)
+
+#### Compañía Minera Doña Inés de Collahuasi
+
+La **Compañía Minera Doña Inés de Collahuasi** es la operación minera de la cual provienen los datos utilizados en este proyecto, según el contexto entregado por sus responsables. Collahuasi se dedica a la extracción y producción de concentrado de cobre y molibdeno. Sus operaciones se ubican en la Región de Tarapacá y comprenden los yacimientos a cielo abierto Rosario y Ujina, situados en la comuna de Pica a una altura promedio aproximada de 4.400 metros sobre el nivel del mar.
+
+Para este trabajo, su relevancia es operacional: las imágenes y videos muestran camiones CAEX en condiciones reales de faena y permiten estudiar la forma visible de la carga y la granulometría visible en tolva. Que los datos procedan de esta operación no debe interpretarse automáticamente como una participación académica directa o un convenio formal de Collahuasi en la Memoria, salvo que exista documentación institucional adicional que lo confirme.
+
+Fuentes oficiales:
+
+- [Nuestra compañía - Collahuasi](https://www.collahuasi.cl/quienes-somos/nuestra-compania/)
+- [Nuestra operación - Collahuasi](https://www.collahuasi.cl/que-hacemos/nuestra-operacion/)
+
+#### Relación resumida
+
+```text
+Universidad de Concepción / Facultad de Ingeniería
+  -> institución académica y marco de la Memoria de Título
+
+PSINet
+  -> empresa colaboradora y contraparte técnica
+
+Collahuasi
+  -> contexto operacional minero y origen de los datos analizados
+```
+
+Información institucional consultada el **2026-07-21**.
+
 ## 2. Resumen ejecutivo
 
 El proyecto analiza la **forma visible de la carga** transportada por camiones CAEX observados desde atrás. El objetivo es determinar si la forma segmentada se observa centrada, con tendencia visual interna hacia la izquierda o con tendencia visual interna hacia la derecha.
