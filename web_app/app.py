@@ -264,53 +264,82 @@ def render_indicator_summary(video: pd.Series | None, features_df: pd.DataFrame)
             p25, median, p75 = values.quantile([0.25, 0.50, 0.75]).tolist()
         rows.append(
             {
-                "indicador": config["label"],
-                "P25": p25,
-                "mediana": median,
-                "P75": p75,
-                "frames_validos": len(values),
+                "Indicador": config["label"],
+                "Mediana": median,
+                "Rango central (P25 - P75)": f"{p25:.4f} a {p75:.4f}",
             }
         )
     table = pd.DataFrame(rows)
-    for column in ["P25", "mediana", "P75"]:
-        table[column] = pd.to_numeric(table[column], errors="coerce").round(4)
+    table["Mediana"] = pd.to_numeric(table["Mediana"], errors="coerce").round(4)
     st.dataframe(table, use_container_width=True, hide_index=True)
-
-
-def render_indicator_distributions(features_df: pd.DataFrame) -> None:
-    st.markdown("#### Distribucion de indicadores")
-    tabs = st.tabs([config["label"] for config in INDICATOR_CONFIG.values()])
-    for tab, (indicator, config) in zip(tabs, INDICATOR_CONFIG.items()):
-        with tab:
-            values = valid_indicator_values(features_df, indicator)
-            if values.empty:
-                st.write("Sin datos validos.")
-                continue
-            minimum, maximum = config["range"]
-            clipped = values.clip(lower=minimum, upper=maximum)
-            bin_width = (maximum - minimum) / 20
-            bin_edges = [minimum + index * bin_width for index in range(21)]
-            intervals = pd.cut(
-                clipped,
-                bins=bin_edges,
-                include_lowest=True,
-            )
-            counts = intervals.value_counts(sort=False)
-            chart = pd.DataFrame(
-                {
-                    "intervalo": [str(interval) for interval in counts.index],
-                    "frames": counts.values,
-                }
-            ).set_index("intervalo")
-            st.bar_chart(chart)
     st.caption(
-        "Los valores negativos indican tendencia visual interna hacia la izquierda; "
-        "los positivos, hacia la derecha. No representan balance fisico ni centro de masa real."
+        "Negativo indica tendencia visual interna hacia la izquierda; positivo, "
+        "hacia la derecha. El rango central contiene la mitad intermedia de los frames validos."
     )
 
 
+def render_indicator_distributions(features_df: pd.DataFrame) -> None:
+    with st.expander("Ver distribuciones de los indicadores"):
+        columns = st.columns(3)
+        for column, (indicator, config) in zip(columns, INDICATOR_CONFIG.items()):
+            with column:
+                st.markdown(f"**{config['label']}**")
+                values = valid_indicator_values(features_df, indicator)
+                if values.empty:
+                    st.write("Sin datos validos.")
+                    continue
+                minimum, maximum = config["range"]
+                clipped = values.clip(lower=minimum, upper=maximum)
+                observed_min = float(clipped.min())
+                observed_max = float(clipped.max())
+                observed_span = observed_max - observed_min
+                padding = max(observed_span * 0.15, (maximum - minimum) * 0.02)
+                chart_min = max(minimum, observed_min - padding)
+                chart_max = min(maximum, observed_max + padding)
+                if chart_max <= chart_min:
+                    chart_min = max(minimum, observed_min - padding)
+                    chart_max = min(maximum, observed_max + padding)
+                bin_count = min(8, max(3, int(len(values) ** 0.5) + 1))
+                bin_width = (chart_max - chart_min) / bin_count
+                bin_edges = [
+                    chart_min + index * bin_width for index in range(bin_count + 1)
+                ]
+                intervals = pd.cut(
+                    clipped,
+                    bins=bin_edges,
+                    include_lowest=True,
+                )
+                counts = intervals.value_counts(sort=False)
+                labels = [
+                    f"{bin_edges[index]:.3f} a {bin_edges[index + 1]:.3f}"
+                    for index in range(bin_count)
+                ]
+                chart = pd.DataFrame(
+                    {
+                        "intervalo": labels,
+                        "frames": counts.values,
+                    }
+                ).set_index("intervalo")
+                st.bar_chart(chart, height=220)
+        st.caption(
+            "La escala visual se ajusta al rango observado y considera solo frames "
+            "validos. Los CSV mantienen histogramas fijos de 20 intervalos para "
+            "analisis y comparacion."
+        )
+
+
+def render_frame_details(features_df: pd.DataFrame) -> None:
+    table = display_frame_table(features_df)
+    frame_count = len(table)
+    with st.expander(f"Ver detalle por frame ({frame_count})"):
+        if table.empty:
+            st.write("Sin resultados por frame.")
+        else:
+            st.dataframe(table, use_container_width=True, hide_index=True)
+
+
 def render_verdict(video: pd.Series | None) -> None:
-    st.subheader("Veredicto")
+    st.subheader("Resultado del video")
     if video is None:
         st.write("Sin veredicto disponible.")
         return
@@ -319,39 +348,35 @@ def render_verdict(video: pd.Series | None) -> None:
     label = VERDICT_LABELS.get(final_verdict, final_verdict)
     confidence = numeric_value(video.get("confidence"))
     valid_ratio = numeric_value(video.get("valid_ratio"))
+    valid_frames = text_value(video.get("valid_frames"), "0")
+    total_frames = text_value(video.get("analytic_rows"), "0")
 
-    cols = st.columns(4)
-    cols[0].metric("veredicto", label)
-    cols[1].metric("confianza", f"{confidence:.2f}")
-    cols[2].metric("frames validos", text_value(video.get("valid_frames"), "0"))
-    cols[3].metric("ratio valido", f"{valid_ratio:.2f}")
+    cols = st.columns([2, 1, 1])
+    cols[0].metric("Veredicto", label)
+    cols[1].metric("Confianza", f"{confidence:.2f}")
+    cols[2].metric(
+        f"Frames evaluables ({valid_ratio:.0%})",
+        f"{valid_frames} de {total_frames}",
+    )
 
 
 def render_statistics(video: pd.Series | None, features_df: pd.DataFrame) -> None:
-    st.subheader("Estadisticas")
+    st.subheader("Resumen")
     if video is not None:
-        cols = st.columns(5)
-        cols[0].metric("frames", text_value(video.get("analytic_rows"), "0"))
-        cols[1].metric("centrado", text_value(video.get("centrado_count"), "0"))
-        cols[2].metric("izquierda", text_value(video.get("izquierda_count"), "0"))
-        cols[3].metric("derecha", text_value(video.get("derecha_count"), "0"))
-        cols[4].metric("no evaluable", text_value(video.get("no_evaluable_count"), "0"))
-
-        geo_cols = st.columns(3)
-        geo_cols[0].metric("peak mediano", f"{numeric_value(video.get('median_peak_x_norm')):.3f}")
-        geo_cols[1].metric("simetria mediana", f"{numeric_value(video.get('median_area_symmetry')):.3f}")
-        geo_cols[2].metric(
-            "centroide mediano",
-            f"{numeric_value(video.get('median_centroid_x_norm')):.3f}",
+        st.markdown("**Resultados por frame**")
+        cols = st.columns(4)
+        cols[0].metric("Centrado", text_value(video.get("centrado_count"), "0"))
+        cols[1].metric("Izquierda", text_value(video.get("izquierda_count"), "0"))
+        cols[2].metric("Derecha", text_value(video.get("derecha_count"), "0"))
+        cols[3].metric(
+            "No evaluable",
+            text_value(video.get("no_evaluable_count"), "0"),
         )
 
+    st.markdown("**Indicadores geometricos**")
     render_indicator_summary(video, features_df)
     render_indicator_distributions(features_df)
-    table = display_frame_table(features_df)
-    if table.empty:
-        st.write("Sin resultados por frame.")
-    else:
-        st.dataframe(table, use_container_width=True, hide_index=True)
+    render_frame_details(features_df)
 
 
 if "last_log" not in st.session_state:
@@ -503,24 +528,30 @@ render_verdict(video)
 render_statistics(video, active_features)
 
 st.subheader("Descargas")
-download_cols = st.columns(6)
+download_cols = st.columns(3)
 with download_cols[0]:
-    file_download("video_summary.csv", paths.video_summary_csv, "text/csv")
+    file_download("Resumen por video", paths.video_summary_csv, "text/csv")
 with download_cols[1]:
-    file_download("features.csv", paths.features_csv, "text/csv")
+    file_download("Resultados por frame", paths.features_csv, "text/csv")
 with download_cols[2]:
-    file_download("indicator_summary.csv", paths.indicator_summary_csv, "text/csv")
-with download_cols[3]:
+    file_download("Resumen de indicadores", paths.indicator_summary_csv, "text/csv")
+
+download_cols = st.columns(3)
+with download_cols[0]:
     file_download(
-        "indicator_distributions.csv",
+        "Distribuciones de indicadores",
         paths.indicator_distributions_csv,
         "text/csv",
     )
-with download_cols[4]:
-    file_download("pipeline_summary.json", paths.pipeline_summary_json, "application/json")
-with download_cols[5]:
+with download_cols[1]:
+    file_download(
+        "Resumen tecnico de la corrida",
+        paths.pipeline_summary_json,
+        "application/json",
+    )
+with download_cols[2]:
     if paths.result_dir.exists():
-        st.write(relative_to_project(paths.result_dir))
+        st.caption(f"Resultados: {relative_to_project(paths.result_dir)}")
 
 with st.expander("Estado tecnico de la corrida"):
     cols = st.columns(5)
