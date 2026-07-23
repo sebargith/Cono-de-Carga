@@ -1,3 +1,7 @@
 outputs/pipeline_runs/
+web_app/.venv/
+web_app/.streamlit/
+web_app/data/
+web_app/outputs/
 __pycache__/
 *.pyc
