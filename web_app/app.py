@@ -94,6 +94,55 @@ st.markdown(
         color: rgba(250, 250, 250, 0.65);
         font-size: 0.9rem;
     }
+    .video-metric-grid {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 12px;
+        margin: 0.75rem 0 1.5rem;
+    }
+    .video-metric-card {
+        min-height: 168px;
+        padding: 1rem 1.1rem;
+        border: 1px solid rgba(164, 185, 194, 0.28);
+        border-radius: 7px;
+        background: rgb(24, 36, 42);
+        display: flex;
+        flex-direction: column;
+    }
+    .video-metric-label {
+        color: rgba(250, 250, 250, 0.94);
+        font-size: 0.92rem;
+        font-weight: 700;
+    }
+    .video-metric-value {
+        margin-top: 0.7rem;
+        color: rgb(250, 250, 250);
+        font-size: 2rem;
+        line-height: 1.15;
+    }
+    .video-metric-value.is-text {
+        font-size: 1.45rem;
+    }
+    .video-metric-help {
+        margin-top: auto;
+        padding-top: 1rem;
+        color: rgb(187, 219, 236);
+        font-size: 0.82rem;
+        line-height: 1.35;
+    }
+    @media (max-width: 1050px) {
+        .video-metric-grid {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+    }
+    @media (max-width: 620px) {
+        .video-metric-grid {
+            grid-template-columns: minmax(0, 1fr);
+        }
+        .video-metric-card {
+            min-height: 148px;
+        }
+    }
     </style>
     """,
     unsafe_allow_html=True,
@@ -338,42 +387,104 @@ def render_frame_details(features_df: pd.DataFrame) -> None:
             st.dataframe(table, use_container_width=True, hide_index=True)
 
 
+def metric_card(
+    label: str,
+    value: str,
+    description: str,
+    *,
+    text_value: bool = False,
+) -> str:
+    value_class = "video-metric-value is-text" if text_value else "video-metric-value"
+    return (
+        '<div class="video-metric-card">'
+        f'<div class="video-metric-label">{html.escape(label)}</div>'
+        f'<div class="{value_class}">{html.escape(value)}</div>'
+        f'<div class="video-metric-help">{html.escape(description)}</div>'
+        "</div>"
+    )
+
+
 def render_verdict(video: pd.Series | None) -> None:
-    st.subheader("Resultado del video")
+    st.subheader("Indicadores generales del video")
     if video is None:
         st.write("Sin veredicto disponible.")
         return
 
     final_verdict = text_value(video.get("final_verdict"), "sin_veredicto")
     label = VERDICT_LABELS.get(final_verdict, final_verdict)
-    confidence = numeric_value(video.get("confidence"))
+    confidence = numeric_value(video.get("confidence")) * 100.0
     valid_ratio = numeric_value(video.get("valid_ratio"))
-    valid_frames = text_value(video.get("valid_frames"), "0")
-    total_frames = text_value(video.get("analytic_rows"), "0")
-
-    cols = st.columns([2, 1, 1])
-    cols[0].metric("Veredicto", label)
-    cols[1].metric("Confianza", f"{confidence:.2f}")
-    cols[2].metric(
-        f"Frames evaluables ({valid_ratio:.0%})",
-        f"{valid_frames} de {total_frames}",
+    cards = [
+        metric_card(
+            "Frames extraidos",
+            text_value(video.get("analytic_rows"), "0"),
+            "Imagenes tomadas del video segun el intervalo configurado.",
+        ),
+        metric_card(
+            "Frames validos",
+            text_value(video.get("valid_frames"), "0"),
+            "Frames con mascara completa y perfil suficiente para evaluar.",
+        ),
+        metric_card(
+            "No evaluables",
+            text_value(video.get("no_evaluable_count"), "0"),
+            "Frames descartados por falta de deteccion o contacto con bordes.",
+        ),
+        metric_card(
+            "Confianza",
+            f"{confidence:.1f}%",
+            "Consistencia del veredicto entre los frames validos.",
+        ),
+        metric_card(
+            "Centrado",
+            f"{numeric_value(video.get('centrado_ratio')):.1%}",
+            "Proporcion de frames validos clasificados como centrados.",
+        ),
+        metric_card(
+            "Izquierda",
+            f"{numeric_value(video.get('izquierda_ratio')):.1%}",
+            "Proporcion de frames validos con tendencia visual hacia la izquierda.",
+        ),
+        metric_card(
+            "Derecha",
+            f"{numeric_value(video.get('derecha_ratio')):.1%}",
+            "Proporcion de frames validos con tendencia visual hacia la derecha.",
+        ),
+        metric_card(
+            "Veredicto",
+            label.upper(),
+            "Resultado agregado a partir de los frames validos.",
+            text_value=True,
+        ),
+        metric_card(
+            "Pico relativo mediano",
+            f"{numeric_value(video.get('median_peak_x_norm')):.3f}",
+            "Posicion horizontal mediana del pico visible de la carga.",
+        ),
+        metric_card(
+            "Simetria interna mediana",
+            f"{numeric_value(video.get('median_area_symmetry')):.3f}",
+            "Diferencia mediana entre las areas visibles izquierda y derecha.",
+        ),
+        metric_card(
+            "Centroide relativo mediano",
+            f"{numeric_value(video.get('median_centroid_x_norm')):.3f}",
+            "Posicion horizontal mediana del centroide de la mascara.",
+        ),
+        metric_card(
+            "Frames evaluables",
+            f"{valid_ratio:.1%}",
+            "Porcentaje de frames extraidos que entregaron un resultado valido.",
+        ),
+    ]
+    st.markdown(
+        '<div class="video-metric-grid">' + "".join(cards) + "</div>",
+        unsafe_allow_html=True,
     )
 
 
 def render_statistics(video: pd.Series | None, features_df: pd.DataFrame) -> None:
-    st.subheader("Resumen")
-    if video is not None:
-        st.markdown("**Resultados por frame**")
-        cols = st.columns(4)
-        cols[0].metric("Centrado", text_value(video.get("centrado_count"), "0"))
-        cols[1].metric("Izquierda", text_value(video.get("izquierda_count"), "0"))
-        cols[2].metric("Derecha", text_value(video.get("derecha_count"), "0"))
-        cols[3].metric(
-            "No evaluable",
-            text_value(video.get("no_evaluable_count"), "0"),
-        )
-
-    st.markdown("**Indicadores geometricos**")
+    st.subheader("Distribucion de los indicadores")
     render_indicator_summary(video, features_df)
     render_indicator_distributions(features_df)
     render_frame_details(features_df)
