@@ -830,6 +830,18 @@ P75 por corrida y por video; `indicator_distributions.csv` registra
 histogramas de 20 intervalos. Se calculan exclusivamente con frames validos y
 describen la forma visible de la carga relativa a su propia segmentacion.
 
+La aplicacion presenta ademas los rangos numericos de interpretacion. Con la
+configuracion vigente, `peak_x_norm` usa `-0.06` y `0.06` como referencias
+laterales, mientras que `area_symmetry` usa `-0.07` y `0.07`.
+`centroid_x_norm` se informa en su rango teorico `[-0.5, 0.5]` como indicador
+descriptivo y no como regla independiente del veredicto.
+
+El script YOLO registra los tiempos entregados por Ultralytics: inferencia
+media por frame, inferencia acumulada, preproceso y postproceso. Tambien mide el
+tiempo de pared de la generacion de mascaras. Estos valores se copian a
+`pipeline_summary.json` y se muestran fuera de las tarjetas generales de la
+web app.
+
 ### 9.1 Veredicto por video
 
 Clases agregadas:

@@ -134,6 +134,12 @@ completa como para cada video. `statistics\indicator_distributions.csv`
 entrega sus histogramas tabulados en 20 intervalos. Solo se consideran frames
 validos.
 
+`pipeline_summary.json` registra tambien:
+
+- los umbrales efectivos de pico y simetria usados por el analitico;
+- la inferencia YOLO media por frame y acumulada, reportada por Ultralytics;
+- el tiempo completo empleado para generar las mascaras analiticas.
+
 Veredictos posibles:
 
 ```text

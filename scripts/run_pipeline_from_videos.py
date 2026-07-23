@@ -307,6 +307,17 @@ def load_yaml_config(path: Path) -> dict[str, Any]:
     return data if isinstance(data, dict) else {}
 
 
+def load_json_dict(path: Path) -> dict[str, Any]:
+    if not path.exists():
+        return {}
+    try:
+        with path.open("r", encoding="utf-8") as f:
+            data = json.load(f)
+    except (OSError, json.JSONDecodeError):
+        return {}
+    return data if isinstance(data, dict) else {}
+
+
 def nested_value(config: dict[str, Any], keys: tuple[str, ...], default: Any) -> Any:
     current: Any = config
     for key in keys:
@@ -960,11 +971,12 @@ def main() -> int:
 
     features_csv = analytic_dir / "tables" / "features.csv"
     feature_rows = read_csv_rows(features_csv)
+    analytic_config_data = load_yaml_config(analytic_config)
     video_summary_rows = build_video_summary(
         frame_manifest_rows=frame_rows,
         video_manifest_rows=video_rows,
         feature_rows=feature_rows,
-        analytic_config=load_yaml_config(analytic_config),
+        analytic_config=analytic_config_data,
         min_valid_ratio=max(min(float(args.video_min_valid_ratio), 1.0), 0.0),
         majority_ratio=max(min(float(args.video_majority_ratio), 1.0), 0.0),
     )
@@ -990,6 +1002,10 @@ def main() -> int:
         INDICATOR_DISTRIBUTION_COLUMNS,
     )
     verdict_counts = Counter(row["final_verdict"] for row in video_summary_rows)
+    yolo_summary = load_json_dict(masks_dir / "summary.json")
+    yolo_timings = yolo_summary.get("timings", {})
+    if not isinstance(yolo_timings, dict):
+        yolo_timings = {}
     summary = {
         "run_name": run_name,
         "videos_dir": str(videos_dir),
@@ -1005,6 +1021,38 @@ def main() -> int:
         "device": args.device,
         "mask_mode": args.mask_mode,
         "interval_seconds": max(float(args.interval_seconds), 0.0),
+        "analytic_rules": {
+            "threshold_peak": float(
+                nested_value(analytic_config_data, ("rules", "threshold_peak"), 0.06)
+            ),
+            "threshold_area": float(
+                nested_value(analytic_config_data, ("rules", "threshold_area"), 0.07)
+            ),
+            "peak_vote_weight": float(
+                nested_value(
+                    analytic_config_data,
+                    ("rules", "peak_vote_weight"),
+                    0.5,
+                )
+            ),
+            "area_vote_weight": float(
+                nested_value(
+                    analytic_config_data,
+                    ("rules", "area_vote_weight"),
+                    0.5,
+                )
+            ),
+        },
+        "timings": {
+            "yolo_inference_total_ms": yolo_timings.get("inference_total_ms"),
+            "yolo_inference_mean_ms_per_image": yolo_timings.get(
+                "inference_mean_ms_per_image"
+            ),
+            "yolo_prediction_wall_seconds": yolo_timings.get(
+                "prediction_wall_seconds"
+            ),
+            "yolo_images_per_second": yolo_timings.get("images_per_second"),
+        },
         "features_csv": str(features_csv),
         "video_summary_csv": str(video_summary_csv),
         "indicator_summary_csv": str(indicator_summary_csv),
@@ -1023,6 +1071,11 @@ def main() -> int:
     print(f"Veredictos por video: {video_summary_csv}")
     print(f"Resumen de indicadores: {indicator_summary_csv}")
     print(f"Distribuciones de indicadores: {indicator_distributions_csv}")
+    if yolo_timings.get("inference_mean_ms_per_image") is not None:
+        print(
+            "Inferencia YOLO: "
+            f"{float(yolo_timings['inference_mean_ms_per_image']):.3f} ms/frame"
+        )
     print(f"Resumen: {summary_path}")
     return 0
 

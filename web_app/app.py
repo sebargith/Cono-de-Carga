@@ -199,6 +199,14 @@ def numeric_value(value: object, default: float = 0.0) -> float:
     return number
 
 
+def optional_numeric_value(value: object) -> float | None:
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return None
+    return None if pd.isna(number) else number
+
+
 def last_log_line(log: str) -> str:
     lines = [line.strip() for line in log.splitlines() if line.strip()]
     return lines[-1] if lines else ""
@@ -404,12 +412,17 @@ def metric_card(
     )
 
 
-def render_verdict(video: pd.Series | None) -> None:
+def render_verdict(video: pd.Series | None, summary: dict) -> None:
     st.subheader("Indicadores generales del video")
     if video is None:
         st.write("Sin veredicto disponible.")
         return
 
+    analytic_rules = summary.get("analytic_rules", {})
+    if not isinstance(analytic_rules, dict):
+        analytic_rules = {}
+    threshold_peak = numeric_value(analytic_rules.get("threshold_peak"), 0.06)
+    threshold_area = numeric_value(analytic_rules.get("threshold_area"), 0.07)
     final_verdict = text_value(video.get("final_verdict"), "sin_veredicto")
     label = VERDICT_LABELS.get(final_verdict, final_verdict)
     confidence = numeric_value(video.get("confidence")) * 100.0
@@ -433,53 +446,99 @@ def render_verdict(video: pd.Series | None) -> None:
         metric_card(
             "Confianza",
             f"{confidence:.1f}%",
-            "Consistencia del veredicto entre los frames validos.",
+            "Escala 0% a 100%: proporcion de la clase dominante entre los frames validos.",
         ),
         metric_card(
             "Centrado",
             f"{numeric_value(video.get('centrado_ratio')):.1%}",
-            "Proporcion de frames validos clasificados como centrados.",
+            "Rango 0% a 100%: proporcion de frames validos clasificados como centrados.",
         ),
         metric_card(
             "Izquierda",
             f"{numeric_value(video.get('izquierda_ratio')):.1%}",
-            "Proporcion de frames validos con tendencia visual hacia la izquierda.",
+            "Rango 0% a 100%: proporcion de frames validos con tendencia hacia la izquierda.",
         ),
         metric_card(
             "Derecha",
             f"{numeric_value(video.get('derecha_ratio')):.1%}",
-            "Proporcion de frames validos con tendencia visual hacia la derecha.",
+            "Rango 0% a 100%: proporcion de frames validos con tendencia hacia la derecha.",
         ),
         metric_card(
             "Veredicto",
             label.upper(),
-            "Resultado agregado a partir de los frames validos.",
+            "Posibles: centrada, izquierda, derecha, mixta o no evaluable.",
             text_value=True,
         ),
         metric_card(
             "Pico relativo mediano",
             f"{numeric_value(video.get('median_peak_x_norm')):.3f}",
-            "Posicion horizontal mediana del pico visible de la carga.",
+            (
+                f"Rango -0.5 a 0.5: < -{threshold_peak:.2f} izquierda; "
+                f"-{threshold_peak:.2f} a {threshold_peak:.2f} centro; "
+                f"> {threshold_peak:.2f} derecha."
+            ),
         ),
         metric_card(
             "Simetria interna mediana",
             f"{numeric_value(video.get('median_area_symmetry')):.3f}",
-            "Diferencia mediana entre las areas visibles izquierda y derecha.",
+            (
+                f"Rango -1 a 1: < -{threshold_area:.2f} izquierda; "
+                f"-{threshold_area:.2f} a {threshold_area:.2f} simetrica; "
+                f"> {threshold_area:.2f} derecha."
+            ),
         ),
         metric_card(
             "Centroide relativo mediano",
             f"{numeric_value(video.get('median_centroid_x_norm')):.3f}",
-            "Posicion horizontal mediana del centroide de la mascara.",
+            (
+                "Rango -0.5 a 0.5: negativo es izquierda, 0 es centro y positivo "
+                "es derecha. Es descriptivo."
+            ),
         ),
         metric_card(
             "Frames evaluables",
             f"{valid_ratio:.1%}",
-            "Porcentaje de frames extraidos que entregaron un resultado valido.",
+            "Rango 0% a 100%: porcentaje de frames con un resultado valido.",
         ),
     ]
     st.markdown(
         '<div class="video-metric-grid">' + "".join(cards) + "</div>",
         unsafe_allow_html=True,
+    )
+
+
+def render_inference_time(summary: dict) -> None:
+    st.subheader("Tiempo de inferencia")
+    timings = summary.get("timings", {})
+    if not isinstance(timings, dict):
+        timings = {}
+    mean_ms = optional_numeric_value(
+        timings.get("yolo_inference_mean_ms_per_image")
+    )
+    total_ms = optional_numeric_value(timings.get("yolo_inference_total_ms"))
+    wall_seconds = optional_numeric_value(
+        timings.get("yolo_prediction_wall_seconds")
+    )
+    if mean_ms is None:
+        st.caption(
+            "No disponible para esta corrida anterior. Se registrara al ejecutar "
+            "nuevamente el pipeline."
+        )
+        return
+
+    columns = st.columns(3)
+    columns[0].metric("Inferencia YOLO por frame", f"{mean_ms:.1f} ms")
+    columns[1].metric(
+        "Inferencia YOLO acumulada",
+        f"{(total_ms or 0.0):.1f} ms",
+    )
+    columns[2].metric(
+        "Generacion de mascaras",
+        f"{(wall_seconds or 0.0):.2f} s",
+    )
+    st.caption(
+        "La inferencia es reportada por Ultralytics. La generacion de mascaras "
+        "incluye prediccion, postproceso y escritura para todos los frames de la corrida."
     )
 
 
@@ -635,7 +694,8 @@ if active_overlays:
 else:
     st.write("Sin overlays.")
 
-render_verdict(video)
+render_verdict(video, summary)
+render_inference_time(summary)
 render_statistics(video, active_features)
 
 st.subheader("Descargas")

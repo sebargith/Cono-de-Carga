@@ -97,3 +97,17 @@ La seccion `Estadisticas` muestra para los frames validos:
 Para cada indicador se informan P25, mediana y P75, junto con su histograma. Los
 valores describen la forma visible dentro de la propia carga segmentada; no
 representan centro de masa real ni balance fisico del camion.
+
+Las tarjetas usan los umbrales guardados en `pipeline_summary.json`:
+
+- `peak_x_norm`: rango `-0.5` a `0.5`; con la configuracion actual, valores
+  menores que `-0.06` aportan hacia izquierda y mayores que `0.06` hacia derecha;
+- `area_symmetry`: rango `-1` a `1`; valores menores que `-0.07` aportan hacia
+  izquierda y mayores que `0.07` hacia derecha;
+- `centroid_x_norm`: rango descriptivo `-0.5` a `0.5`, donde el signo indica el
+  lado respecto del centro interno de la mascara.
+
+Debajo de las tarjetas se muestra el tiempo de inferencia reportado por
+Ultralytics en milisegundos por frame y acumulados. Tambien se informa el tiempo
+completo de generacion de mascaras, que incluye prediccion, postproceso y
+escritura.
