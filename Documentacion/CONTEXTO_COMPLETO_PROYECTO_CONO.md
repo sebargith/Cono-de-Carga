@@ -817,9 +817,18 @@ outputs\pipeline_runs\<run_name>\
   manifests\frames.csv
   manifests\yolo_manifest.csv
   manifests\yolo_summary.json
+  statistics\indicator_summary.csv
+  statistics\indicator_distributions.csv
   video_summary.csv
   pipeline_summary.json
 ```
+
+Desde julio de 2026, el pipeline agrega un resumen estadistico de los tres
+indicadores geometricos mas descriptivos: `peak_x_norm`, `area_symmetry` y
+`centroid_x_norm`. `indicator_summary.csv` registra cantidad, P25, mediana y
+P75 por corrida y por video; `indicator_distributions.csv` registra
+histogramas de 20 intervalos. Se calculan exclusivamente con frames validos y
+describen la forma visible de la carga relativa a su propia segmentacion.
 
 ### 9.1 Veredicto por video
 

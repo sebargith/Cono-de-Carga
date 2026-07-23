@@ -26,6 +26,8 @@ class RunPaths:
     features_csv: Path
     frame_manifest_csv: Path
     video_summary_csv: Path
+    indicator_summary_csv: Path
+    indicator_distributions_csv: Path
     pipeline_summary_json: Path
 
 
@@ -80,6 +82,10 @@ def paths_for_run(run_name: str) -> RunPaths:
         features_csv=analytic_dir / "tables" / "features.csv",
         frame_manifest_csv=result_dir / "manifests" / "frames.csv",
         video_summary_csv=result_dir / "video_summary.csv",
+        indicator_summary_csv=result_dir / "statistics" / "indicator_summary.csv",
+        indicator_distributions_csv=(
+            result_dir / "statistics" / "indicator_distributions.csv"
+        ),
         pipeline_summary_json=result_dir / "pipeline_summary.json",
     )
 

@@ -61,6 +61,9 @@ results/
     overlays/
     tables/features.csv
   manifests/
+  statistics/
+    indicator_summary.csv
+    indicator_distributions.csv
   video_summary.csv
   pipeline_summary.json
 ```
@@ -114,6 +117,18 @@ results/video_summary.csv
 ```
 
 Ese archivo contiene el veredicto final por video.
+
+Ademas, `results/statistics/` contiene resultados descriptivos para los frames
+validos de la corrida y de cada video:
+
+- `indicator_summary.csv`: cantidad, P25, mediana y P75 de `peak_x_norm`,
+  `area_symmetry` y `centroid_x_norm`;
+- `indicator_distributions.csv`: histogramas tabulados de 20 intervalos para
+  esos mismos indicadores.
+
+Estas variables describen la distribucion visual interna de la carga
+segmentada. Sus signos indican tendencia hacia izquierda o derecha respecto de
+la propia mascara, no balance fisico ni distribucion real del payload.
 
 ## 2. Web app
 

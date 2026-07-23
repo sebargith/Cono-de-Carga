@@ -17,6 +17,16 @@ import cv2
 
 
 ROOT = Path(__file__).resolve().parents[1]
+SRC_DIR = ROOT / "src"
+if str(SRC_DIR) not in sys.path:
+    sys.path.insert(0, str(SRC_DIR))
+
+from cone_load.statistics import (  # noqa: E402
+    indicator_distribution_rows,
+    indicator_summary_rows,
+    summarize_indicators,
+)
+
 DEFAULT_MODEL = (
     "perception/models/reference/"
     "carga_visible_yolov8n-seg_20260527_195509/best.pt"
@@ -47,15 +57,45 @@ VIDEO_SUMMARY_COLUMNS = [
     "centrado_ratio",
     "izquierda_ratio",
     "derecha_ratio",
+    "p25_peak_x_norm",
     "median_peak_x_norm",
+    "p75_peak_x_norm",
     "mean_peak_x_norm",
+    "p25_area_symmetry",
     "median_area_symmetry",
+    "p75_area_symmetry",
     "mean_area_symmetry",
+    "p25_centroid_x_norm",
+    "median_centroid_x_norm",
+    "p75_centroid_x_norm",
+    "mean_centroid_x_norm",
     "mean_profile_roughness",
     "mean_num_peaks",
     "final_verdict",
     "confidence",
     "verdict_reason",
+]
+INDICATOR_SUMMARY_COLUMNS = [
+    "scope_type",
+    "scope_id",
+    "scope_name",
+    "indicator",
+    "indicator_label",
+    "count",
+    "p25",
+    "median",
+    "p75",
+]
+INDICATOR_DISTRIBUTION_COLUMNS = [
+    "scope_type",
+    "scope_id",
+    "scope_name",
+    "indicator",
+    "indicator_label",
+    "bin_index",
+    "bin_start",
+    "bin_end",
+    "count",
 ]
 
 
@@ -634,6 +674,13 @@ def build_video_summary(
             for value in (finite_float_from_csv(row.get("area_symmetry")) for row in valid_features)
             if value is not None
         ]
+        centroid_values = [
+            value
+            for value in (
+                finite_float_from_csv(row.get("centroid_x_norm")) for row in valid_features
+            )
+            if value is not None
+        ]
         roughness_values = [
             value
             for value in (
@@ -650,8 +697,13 @@ def build_video_summary(
         mean_peak = mean_or_nan(peak_values)
         median_area = median_or_nan(area_values)
         mean_area = mean_or_nan(area_values)
+        mean_centroid = mean_or_nan(centroid_values)
         mean_roughness = mean_or_nan(roughness_values)
         mean_num_peaks = mean_or_nan(num_peak_values)
+        indicator_stats = summarize_indicators(valid_features, valid_only=False)
+        peak_stats = indicator_stats["peak_x_norm"]
+        area_stats = indicator_stats["area_symmetry"]
+        centroid_stats = indicator_stats["centroid_x_norm"]
         final_verdict, confidence, verdict_reason = decide_video_verdict(
             valid_ratio=valid_ratio,
             centered_ratio=centered_ratio,
@@ -682,10 +734,18 @@ def build_video_summary(
                 "centrado_ratio": fmt_float(centered_ratio),
                 "izquierda_ratio": fmt_float(left_ratio),
                 "derecha_ratio": fmt_float(right_ratio),
+                "p25_peak_x_norm": fmt_float(float(peak_stats["p25"])),
                 "median_peak_x_norm": fmt_float(median_peak),
+                "p75_peak_x_norm": fmt_float(float(peak_stats["p75"])),
                 "mean_peak_x_norm": fmt_float(mean_peak),
+                "p25_area_symmetry": fmt_float(float(area_stats["p25"])),
                 "median_area_symmetry": fmt_float(median_area),
+                "p75_area_symmetry": fmt_float(float(area_stats["p75"])),
                 "mean_area_symmetry": fmt_float(mean_area),
+                "p25_centroid_x_norm": fmt_float(float(centroid_stats["p25"])),
+                "median_centroid_x_norm": fmt_float(float(centroid_stats["median"])),
+                "p75_centroid_x_norm": fmt_float(float(centroid_stats["p75"])),
+                "mean_centroid_x_norm": fmt_float(mean_centroid),
                 "mean_profile_roughness": fmt_float(mean_roughness),
                 "mean_num_peaks": fmt_float(mean_num_peaks),
                 "final_verdict": final_verdict,
@@ -697,12 +757,87 @@ def build_video_summary(
     return rows
 
 
+def build_indicator_outputs(
+    frame_manifest_rows: list[dict[str, Any]],
+    video_manifest_rows: list[dict[str, Any]],
+    feature_rows: list[dict[str, str]],
+    run_name: str,
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    summary_rows = indicator_summary_rows(
+        feature_rows,
+        scope_type="run",
+        scope_id=run_name,
+        scope_name=run_name,
+    )
+    distribution_rows = indicator_distribution_rows(
+        feature_rows,
+        scope_type="run",
+        scope_id=run_name,
+        scope_name=run_name,
+    )
+
+    frame_to_video = {
+        str(row["frame_name"]): str(row["video_id"]) for row in frame_manifest_rows
+    }
+    features_by_video: dict[str, list[dict[str, str]]] = {}
+    for feature in feature_rows:
+        video_id = frame_to_video.get(str(feature.get("image_name", "")))
+        if video_id is not None:
+            features_by_video.setdefault(video_id, []).append(feature)
+
+    for video in video_manifest_rows:
+        video_id = str(video["video_id"])
+        video_name = str(video["video_name"])
+        rows = features_by_video.get(video_id, [])
+        summary_rows.extend(
+            indicator_summary_rows(
+                rows,
+                scope_type="video",
+                scope_id=video_id,
+                scope_name=video_name,
+            )
+        )
+        distribution_rows.extend(
+            indicator_distribution_rows(
+                rows,
+                scope_type="video",
+                scope_id=video_id,
+                scope_name=video_name,
+            )
+        )
+
+    for row in summary_rows:
+        for field in ("p25", "median", "p75"):
+            row[field] = fmt_float(float(row[field]))
+    for row in distribution_rows:
+        row["bin_start"] = fmt_float(float(row["bin_start"]))
+        row["bin_end"] = fmt_float(float(row["bin_end"]))
+    return summary_rows, distribution_rows
+
+
+def json_safe_indicator_summary(
+    rows: list[dict[str, str]],
+) -> dict[str, dict[str, Any]]:
+    summaries = summarize_indicators(rows)
+    output: dict[str, dict[str, Any]] = {}
+    for indicator, values in summaries.items():
+        output[indicator] = {}
+        for key, value in values.items():
+            if isinstance(value, float) and not math.isfinite(value):
+                output[indicator][key] = None
+            else:
+                output[indicator][key] = value
+    return output
+
+
 def summarize_features(features_csv: Path) -> dict[str, Any]:
     rows = read_csv_rows(features_csv)
     class_counts = Counter(row.get("predicted_class", "") for row in rows)
-    valid_rows = [row for row in rows if row.get("is_valid") == "True"]
+    valid_rows = [row for row in rows if bool_from_csv(row.get("is_valid", ""))]
     invalid_reasons = Counter(
-        row.get("error_reason", "") for row in rows if row.get("is_valid") != "True"
+        row.get("error_reason", "")
+        for row in rows
+        if not bool_from_csv(row.get("is_valid", ""))
     )
     return {
         "rows": len(rows),
@@ -710,6 +845,7 @@ def summarize_features(features_csv: Path) -> dict[str, Any]:
         "invalid": len(rows) - len(valid_rows),
         "predicted_class_counts": dict(class_counts),
         "invalid_reason_counts": dict(invalid_reasons),
+        "indicator_statistics": json_safe_indicator_summary(rows),
     }
 
 
@@ -834,6 +970,25 @@ def main() -> int:
     )
     video_summary_csv = output_dir / "video_summary.csv"
     write_manifest_csv(video_summary_csv, video_summary_rows, VIDEO_SUMMARY_COLUMNS)
+    indicator_summary_rows_data, indicator_distribution_rows_data = build_indicator_outputs(
+        frame_manifest_rows=frame_rows,
+        video_manifest_rows=video_rows,
+        feature_rows=feature_rows,
+        run_name=run_name,
+    )
+    statistics_dir = output_dir / "statistics"
+    indicator_summary_csv = statistics_dir / "indicator_summary.csv"
+    indicator_distributions_csv = statistics_dir / "indicator_distributions.csv"
+    write_manifest_csv(
+        indicator_summary_csv,
+        indicator_summary_rows_data,
+        INDICATOR_SUMMARY_COLUMNS,
+    )
+    write_manifest_csv(
+        indicator_distributions_csv,
+        indicator_distribution_rows_data,
+        INDICATOR_DISTRIBUTION_COLUMNS,
+    )
     verdict_counts = Counter(row["final_verdict"] for row in video_summary_rows)
     summary = {
         "run_name": run_name,
@@ -852,6 +1007,8 @@ def main() -> int:
         "interval_seconds": max(float(args.interval_seconds), 0.0),
         "features_csv": str(features_csv),
         "video_summary_csv": str(video_summary_csv),
+        "indicator_summary_csv": str(indicator_summary_csv),
+        "indicator_distributions_csv": str(indicator_distributions_csv),
         "video_verdict_counts": dict(verdict_counts),
         "feature_summary": summarize_features(features_csv),
     }
@@ -864,6 +1021,8 @@ def main() -> int:
     print(f"Mascaras YOLO: {masks_dir}")
     print(f"Resultados analitico: {analytic_dir}")
     print(f"Veredictos por video: {video_summary_csv}")
+    print(f"Resumen de indicadores: {indicator_summary_csv}")
+    print(f"Distribuciones de indicadores: {indicator_distributions_csv}")
     print(f"Resumen: {summary_path}")
     return 0
 

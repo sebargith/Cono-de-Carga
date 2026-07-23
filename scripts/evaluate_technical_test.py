@@ -3,7 +3,9 @@ from __future__ import annotations
 import argparse
 import csv
 import json
+import math
 import shutil
+import sys
 from collections import Counter
 from pathlib import Path
 from typing import Any
@@ -11,6 +13,16 @@ from typing import Any
 import cv2
 import numpy as np
 
+ROOT = Path(__file__).resolve().parents[1]
+SRC_DIR = ROOT / "src"
+if str(SRC_DIR) not in sys.path:
+    sys.path.insert(0, str(SRC_DIR))
+
+from cone_load.statistics import (  # noqa: E402
+    indicator_distribution_rows,
+    indicator_summary_rows,
+    summarize_indicators,
+)
 
 EXPECTED_CLASSES = ("centrado", "izquierda", "derecha")
 PREDICTED_CLASSES = (*EXPECTED_CLASSES, "no_evaluable")
@@ -135,6 +147,7 @@ def copy_outputs(rows: list[dict[str, str]], output_dir: Path) -> list[dict[str,
                 "error_reason": row.get("error_reason", ""),
                 "peak_x_norm": row.get("peak_x_norm", ""),
                 "area_symmetry": row.get("area_symmetry", ""),
+                "centroid_x_norm": row.get("centroid_x_norm", ""),
                 "profile_roughness": row.get("profile_roughness", ""),
                 "overlay_path": str(overlay_target) if overlay_target.exists() else "",
             }
@@ -170,6 +183,7 @@ def build_metrics(rows: list[dict[str, Any]]) -> dict[str, Any]:
             "accuracy_evaluable": (
                 len(selected_correct) / len(selected_valid) if selected_valid else 0.0
             ),
+            "indicator_statistics": json_safe_indicator_summary(selected),
         }
     return {
         "total": total,
@@ -182,7 +196,59 @@ def build_metrics(rows: list[dict[str, Any]]) -> dict[str, Any]:
         "confusion_matrix": confusion,
         "per_class": per_class,
         "prediction_counts": dict(Counter(row["predicted_class"] for row in rows)),
+        "indicator_statistics": json_safe_indicator_summary(rows),
     }
+
+
+def json_safe_indicator_summary(
+    rows: list[dict[str, Any]],
+) -> dict[str, dict[str, Any]]:
+    summaries = summarize_indicators(rows)
+    output: dict[str, dict[str, Any]] = {}
+    for indicator, summary in summaries.items():
+        output[indicator] = {}
+        for key, value in summary.items():
+            if isinstance(value, float) and not math.isfinite(value):
+                output[indicator][key] = None
+            else:
+                output[indicator][key] = value
+    return output
+
+
+def build_indicator_tables(
+    rows: list[dict[str, Any]],
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    summary_rows = indicator_summary_rows(
+        rows,
+        scope_type="prueba_tecnica",
+        scope_id="total",
+        scope_name="Total",
+    )
+    distribution_rows = indicator_distribution_rows(
+        rows,
+        scope_type="prueba_tecnica",
+        scope_id="total",
+        scope_name="Total",
+    )
+    for expected in EXPECTED_CLASSES:
+        selected = [row for row in rows if row["expected_class"] == expected]
+        summary_rows.extend(
+            indicator_summary_rows(
+                selected,
+                scope_type="clase_esperada",
+                scope_id=expected,
+                scope_name=DISPLAY_NAMES[expected],
+            )
+        )
+        distribution_rows.extend(
+            indicator_distribution_rows(
+                selected,
+                scope_type="clase_esperada",
+                scope_id=expected,
+                scope_name=DISPLAY_NAMES[expected],
+            )
+        )
+    return summary_rows, distribution_rows
 
 
 def centered_text(
@@ -377,8 +443,40 @@ def main() -> int:
             "error_reason",
             "peak_x_norm",
             "area_symmetry",
+            "centroid_x_norm",
             "profile_roughness",
             "overlay_path",
+        ],
+    )
+    indicator_rows, distribution_rows = build_indicator_tables(evaluated)
+    write_csv(
+        output_dir / "indicadores_geometricos.csv",
+        indicator_rows,
+        [
+            "scope_type",
+            "scope_id",
+            "scope_name",
+            "indicator",
+            "indicator_label",
+            "count",
+            "p25",
+            "median",
+            "p75",
+        ],
+    )
+    write_csv(
+        output_dir / "distribuciones_geometricas.csv",
+        distribution_rows,
+        [
+            "scope_type",
+            "scope_id",
+            "scope_name",
+            "indicator",
+            "indicator_label",
+            "bin_index",
+            "bin_start",
+            "bin_end",
+            "count",
         ],
     )
     (output_dir / "resumen_evaluacion.json").write_text(

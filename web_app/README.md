@@ -72,6 +72,19 @@ work\
 results\
   analytic\
   manifests\
+  statistics\
+    indicator_summary.csv
+    indicator_distributions.csv
   video_summary.csv
   pipeline_summary.json
 ```
+
+La seccion `Estadisticas` muestra para los frames validos:
+
+- `peak_x_norm`: posicion relativa del pico principal;
+- `area_symmetry`: diferencia relativa entre las areas visibles derecha e izquierda;
+- `centroid_x_norm`: posicion relativa del centroide de la mascara.
+
+Para cada indicador se informan P25, mediana y P75, junto con su histograma. Los
+valores describen la forma visible dentro de la propia carga segmentada; no
+representan centro de masa real ni balance fisico del camion.

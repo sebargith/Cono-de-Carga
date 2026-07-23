@@ -55,6 +55,21 @@ VERDICT_LABELS = {
     "no_evaluable": "No evaluable",
 }
 
+INDICATOR_CONFIG = {
+    "peak_x_norm": {
+        "label": "Posicion relativa del pico",
+        "range": (-0.5, 0.5),
+    },
+    "area_symmetry": {
+        "label": "Simetria interna de area",
+        "range": (-1.0, 1.0),
+    },
+    "centroid_x_norm": {
+        "label": "Posicion relativa del centroide",
+        "range": (-0.5, 0.5),
+    },
+}
+
 st.set_page_config(
     page_title="Cono de Carga - Pipeline",
     layout="wide",
@@ -220,6 +235,80 @@ def display_frame_table(features_df: pd.DataFrame) -> pd.DataFrame:
     return table
 
 
+def valid_indicator_values(features_df: pd.DataFrame, indicator: str) -> pd.Series:
+    if features_df.empty or indicator not in features_df.columns:
+        return pd.Series(dtype=float)
+    valid = features_df
+    if "is_valid" in valid.columns:
+        valid_flags = (
+            valid["is_valid"]
+            .astype(str)
+            .str.lower()
+            .isin(["true", "1", "si", "yes"])
+        )
+        valid = valid[valid_flags]
+    return pd.to_numeric(valid[indicator], errors="coerce").dropna()
+
+
+def render_indicator_summary(video: pd.Series | None, features_df: pd.DataFrame) -> None:
+    rows = []
+    for indicator, config in INDICATOR_CONFIG.items():
+        values = valid_indicator_values(features_df, indicator)
+        if video is not None:
+            p25 = numeric_value(video.get(f"p25_{indicator}"), float("nan"))
+            median = numeric_value(video.get(f"median_{indicator}"), float("nan"))
+            p75 = numeric_value(video.get(f"p75_{indicator}"), float("nan"))
+        elif values.empty:
+            p25 = median = p75 = float("nan")
+        else:
+            p25, median, p75 = values.quantile([0.25, 0.50, 0.75]).tolist()
+        rows.append(
+            {
+                "indicador": config["label"],
+                "P25": p25,
+                "mediana": median,
+                "P75": p75,
+                "frames_validos": len(values),
+            }
+        )
+    table = pd.DataFrame(rows)
+    for column in ["P25", "mediana", "P75"]:
+        table[column] = pd.to_numeric(table[column], errors="coerce").round(4)
+    st.dataframe(table, use_container_width=True, hide_index=True)
+
+
+def render_indicator_distributions(features_df: pd.DataFrame) -> None:
+    st.markdown("#### Distribucion de indicadores")
+    tabs = st.tabs([config["label"] for config in INDICATOR_CONFIG.values()])
+    for tab, (indicator, config) in zip(tabs, INDICATOR_CONFIG.items()):
+        with tab:
+            values = valid_indicator_values(features_df, indicator)
+            if values.empty:
+                st.write("Sin datos validos.")
+                continue
+            minimum, maximum = config["range"]
+            clipped = values.clip(lower=minimum, upper=maximum)
+            bin_width = (maximum - minimum) / 20
+            bin_edges = [minimum + index * bin_width for index in range(21)]
+            intervals = pd.cut(
+                clipped,
+                bins=bin_edges,
+                include_lowest=True,
+            )
+            counts = intervals.value_counts(sort=False)
+            chart = pd.DataFrame(
+                {
+                    "intervalo": [str(interval) for interval in counts.index],
+                    "frames": counts.values,
+                }
+            ).set_index("intervalo")
+            st.bar_chart(chart)
+    st.caption(
+        "Los valores negativos indican tendencia visual interna hacia la izquierda; "
+        "los positivos, hacia la derecha. No representan balance fisico ni centro de masa real."
+    )
+
+
 def render_verdict(video: pd.Series | None) -> None:
     st.subheader("Veredicto")
     if video is None:
@@ -248,12 +337,16 @@ def render_statistics(video: pd.Series | None, features_df: pd.DataFrame) -> Non
         cols[3].metric("derecha", text_value(video.get("derecha_count"), "0"))
         cols[4].metric("no evaluable", text_value(video.get("no_evaluable_count"), "0"))
 
-        geo_cols = st.columns(4)
+        geo_cols = st.columns(3)
         geo_cols[0].metric("peak mediano", f"{numeric_value(video.get('median_peak_x_norm')):.3f}")
         geo_cols[1].metric("simetria mediana", f"{numeric_value(video.get('median_area_symmetry')):.3f}")
-        geo_cols[2].metric("rugosidad media", f"{numeric_value(video.get('mean_profile_roughness')):.3f}")
-        geo_cols[3].metric("picos medios", f"{numeric_value(video.get('mean_num_peaks')):.2f}")
+        geo_cols[2].metric(
+            "centroide mediano",
+            f"{numeric_value(video.get('median_centroid_x_norm')):.3f}",
+        )
 
+    render_indicator_summary(video, features_df)
+    render_indicator_distributions(features_df)
     table = display_frame_table(features_df)
     if table.empty:
         st.write("Sin resultados por frame.")
@@ -410,14 +503,22 @@ render_verdict(video)
 render_statistics(video, active_features)
 
 st.subheader("Descargas")
-download_cols = st.columns(4)
+download_cols = st.columns(6)
 with download_cols[0]:
     file_download("video_summary.csv", paths.video_summary_csv, "text/csv")
 with download_cols[1]:
     file_download("features.csv", paths.features_csv, "text/csv")
 with download_cols[2]:
-    file_download("pipeline_summary.json", paths.pipeline_summary_json, "application/json")
+    file_download("indicator_summary.csv", paths.indicator_summary_csv, "text/csv")
 with download_cols[3]:
+    file_download(
+        "indicator_distributions.csv",
+        paths.indicator_distributions_csv,
+        "text/csv",
+    )
+with download_cols[4]:
+    file_download("pipeline_summary.json", paths.pipeline_summary_json, "application/json")
+with download_cols[5]:
     if paths.result_dir.exists():
         st.write(relative_to_project(paths.result_dir))
 

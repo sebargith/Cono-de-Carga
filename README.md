@@ -113,3 +113,7 @@ scripts/run_pipeline_from_videos.py
 ```
 
 Este flujo extrae frames, genera mascaras automaticas con YOLO-seg y ejecuta el analitico geometrico. La guia esta en [`docs/pipeline_videos_locales.md`](docs/pipeline_videos_locales.md).
+
+Cada corrida tambien genera P25, mediana, P75 e histogramas tabulados de
+`peak_x_norm`, `area_symmetry` y `centroid_x_norm` para describir la
+distribucion visual interna de la carga.

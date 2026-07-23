@@ -16,8 +16,16 @@ import numpy as np
 
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT_DIR = Path(__file__).resolve().parent
+SRC_DIR = ROOT / "src"
 if str(SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIR))
+if str(SRC_DIR) not in sys.path:
+    sys.path.insert(0, str(SRC_DIR))
+
+from cone_load.statistics import (  # noqa: E402
+    indicator_distribution_rows,
+    indicator_summary_rows,
+)
 
 from run_pipeline_from_videos import (  # noqa: E402
     DEFAULT_MODEL,
@@ -27,6 +35,7 @@ from run_pipeline_from_videos import (  # noqa: E402
     is_relative_to,
     load_yaml_config,
     nested_value,
+    json_safe_indicator_summary,
     perception_host_path,
     prepare_clean_dir,
     read_csv_rows,
@@ -42,8 +51,17 @@ IMAGE_EXTENSIONS = (".jpg", ".jpeg", ".png", ".bmp", ".tif", ".tiff")
 RESULT_CLASSES = ("izquierda", "centrado", "derecha", "no_evaluable")
 
 
+def write_image(path: Path, image: np.ndarray) -> None:
+    extension = path.suffix or ".png"
+    ok, encoded = cv2.imencode(extension, image)
+    if not ok:
+        raise OSError(f"No se pudo codificar imagen: {path}")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    encoded.tofile(str(path))
+
+
 def parse_args() -> argparse.Namespace:
-    default_images = ROOT / "Presentación gerente Psinet" / "data"
+    default_images = ROOT / "Presentación Psinet" / "data"
     parser = argparse.ArgumentParser(
         description=(
             "Corre YOLO + analitico sobre una muestra de imagenes sueltas, "
@@ -53,7 +71,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--images-dir",
         default=str(default_images),
-        help="Carpeta con imagenes de entrada. Por defecto usa Presentacion gerente Psinet/data.",
+        help="Carpeta con imagenes de entrada. Por defecto usa Presentacion Psinet/data.",
     )
     parser.add_argument(
         "--run-name",
@@ -73,7 +91,7 @@ def parse_args() -> argparse.Namespace:
         default=None,
         help=(
             "Carpeta final de resultados. Por defecto queda en "
-            "Presentacion gerente Psinet/resultados_muestra/<run-name>."
+            "Presentacion Psinet/resultados_muestra/<run-name>."
         ),
     )
     parser.add_argument(
@@ -121,7 +139,7 @@ def parse_args() -> argparse.Namespace:
 
 
 def default_run_name() -> str:
-    return datetime.now().strftime("muestra_gerente_%Y%m%d_%H%M%S")
+    return datetime.now().strftime("muestra_%Y%m%d_%H%M%S")
 
 
 def list_images(images_dir: Path, recursive: bool) -> list[Path]:
@@ -360,8 +378,7 @@ def draw_bar_chart(
             2,
         )
 
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    cv2.imwrite(str(output_path), canvas)
+    write_image(output_path, canvas)
 
 
 def draw_numeric_histogram(
@@ -462,8 +479,7 @@ def draw_numeric_histogram(
         2,
     )
 
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    cv2.imwrite(str(output_path), canvas)
+    write_image(output_path, canvas)
 
 
 def build_summary(
@@ -486,6 +502,7 @@ def build_summary(
             class_name: ratio_text(int(counts[class_name]), total) for class_name in RESULT_CLASSES
         },
         "invalid_reason_counts": dict(invalid_reasons),
+        "indicator_statistics": json_safe_indicator_summary(rows),
         "settings": {
             "conf": args.conf,
             "imgsz": args.imgsz,
@@ -506,7 +523,7 @@ def main() -> int:
     yolo_model = require_file(perception_host_path(args.yolo_model, perception_dir), "yolo-model")
 
     work_base = perception_dir / "model_testing" / "presentation_sample_runs"
-    output_base = ROOT / "Presentación gerente Psinet" / "resultados_muestra"
+    output_base = ROOT / "Presentación Psinet" / "resultados_muestra"
     work_dir = resolve_repo_path(args.work_dir) if args.work_dir else work_base / run_name
     output_dir = resolve_repo_path(args.output_dir) if args.output_dir else output_base / run_name
 
@@ -629,6 +646,13 @@ def main() -> int:
         for value in (finite_float_from_csv(row.get("area_symmetry")) for row in valid_rows)
         if value is not None
     ]
+    centroid_values = [
+        value
+        for value in (
+            finite_float_from_csv(row.get("centroid_x_norm")) for row in valid_rows
+        )
+        if value is not None
+    ]
     config = load_yaml_config(analytic_config)
     threshold_peak = float(nested_value(config, ("rules", "threshold_peak"), 0.09))
     threshold_area = float(nested_value(config, ("rules", "threshold_area"), 0.10))
@@ -655,6 +679,65 @@ def main() -> int:
         x_max=1.0,
         thresholds=(-threshold_area, threshold_area),
     )
+    draw_numeric_histogram(
+        centroid_values,
+        summary_dir / "histograma_centroid_x_norm.png",
+        "Histograma centroid_x_norm",
+        x_min=-0.5,
+        x_max=0.5,
+        thresholds=None,
+    )
+
+    indicator_rows = indicator_summary_rows(
+        feature_rows,
+        scope_type="muestra",
+        scope_id=run_name,
+        scope_name=run_name,
+    )
+    for row in indicator_rows:
+        for field in ("p25", "median", "p75"):
+            row[field] = fmt_float(float(row[field]))
+    indicators_csv = summary_dir / "indicadores_geometricos.csv"
+    write_csv(
+        indicators_csv,
+        indicator_rows,
+        [
+            "scope_type",
+            "scope_id",
+            "scope_name",
+            "indicator",
+            "indicator_label",
+            "count",
+            "p25",
+            "median",
+            "p75",
+        ],
+    )
+    distribution_rows = indicator_distribution_rows(
+        feature_rows,
+        scope_type="muestra",
+        scope_id=run_name,
+        scope_name=run_name,
+    )
+    for row in distribution_rows:
+        row["bin_start"] = fmt_float(float(row["bin_start"]))
+        row["bin_end"] = fmt_float(float(row["bin_end"]))
+    distributions_csv = summary_dir / "distribuciones_geometricas.csv"
+    write_csv(
+        distributions_csv,
+        distribution_rows,
+        [
+            "scope_type",
+            "scope_id",
+            "scope_name",
+            "indicator",
+            "indicator_label",
+            "bin_index",
+            "bin_start",
+            "bin_end",
+            "count",
+        ],
+    )
 
     paths = {
         "input_images_dir": str(images_dir),
@@ -669,6 +752,9 @@ def main() -> int:
         "histogram_results": str(summary_dir / "histograma_resultados.png"),
         "histogram_peak_x_norm": str(summary_dir / "histograma_peak_x_norm.png"),
         "histogram_area_symmetry": str(summary_dir / "histograma_area_symmetry.png"),
+        "histogram_centroid_x_norm": str(summary_dir / "histograma_centroid_x_norm.png"),
+        "indicator_summary_csv": str(indicators_csv),
+        "indicator_distributions_csv": str(distributions_csv),
     }
     summary = build_summary(feature_rows, counts, invalid_reasons, paths, args)
     summary_path = summary_dir / "resumen_muestra.json"

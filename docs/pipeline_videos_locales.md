@@ -89,6 +89,9 @@ D:\Memoria\Cono\outputs\pipeline_runs\prueba_videos_01\
     frames.csv
     yolo_manifest.csv
     yolo_summary.json
+  statistics\
+    indicator_summary.csv
+    indicator_distributions.csv
   video_summary.csv
   pipeline_summary.json
 ```
@@ -111,12 +114,25 @@ valid_ratio
 centrado_ratio
 izquierda_ratio
 derecha_ratio
+p25_peak_x_norm
 median_peak_x_norm
+p75_peak_x_norm
+p25_area_symmetry
 median_area_symmetry
+p75_area_symmetry
+p25_centroid_x_norm
+median_centroid_x_norm
+p75_centroid_x_norm
 final_verdict
 confidence
 verdict_reason
 ```
+
+`statistics\indicator_summary.csv` entrega cantidad, P25, mediana y P75 de
+`peak_x_norm`, `area_symmetry` y `centroid_x_norm`, tanto para la corrida
+completa como para cada video. `statistics\indicator_distributions.csv`
+entrega sus histogramas tabulados en 20 intervalos. Solo se consideran frames
+validos.
 
 Veredictos posibles:
 

@@ -138,6 +138,10 @@ web_app/
             yolo_manifest.csv
             yolo_summary.json
 
+          statistics/
+            indicator_summary.csv
+            indicator_distributions.csv
+
           video_summary.csv
           pipeline_summary.json
 ```
@@ -365,9 +369,27 @@ Ese archivo resume, por video:
 - ratio de frames centrados,
 - ratio de frames izquierda,
 - ratio de frames derecha,
-- medianas de variables geometricas,
+- P25, mediana, P75 y media de las variables geometricas principales,
 - veredicto final,
 - confianza del veredicto.
+
+Los tres indicadores descriptivos principales son:
+
+- `peak_x_norm`: posicion horizontal normalizada del pico visible;
+- `area_symmetry`: diferencia relativa de area visible entre ambos lados;
+- `centroid_x_norm`: posicion horizontal normalizada del centroide de la mascara.
+
+El pipeline tambien escribe:
+
+```text
+results/statistics/indicator_summary.csv
+results/statistics/indicator_distributions.csv
+```
+
+El primer archivo entrega P25, mediana y P75 por corrida y por video. El
+segundo entrega histogramas tabulados de 20 intervalos. Solo se consideran
+frames validos. Estos resultados caracterizan la forma visible de la carga,
+sin interpretarlos como centro de masa real o balance fisico del camion.
 
 El veredicto final puede quedar como:
 
