@@ -53,8 +53,17 @@ pip install -r web_app\requirements.txt
 ```powershell
 cd D:\Memoria\Cono
 .\web_app\.venv\Scripts\Activate.ps1
-streamlit run web_app\app.py
+streamlit run web_app\app.py --server.address 127.0.0.1 --server.port 8502
 ```
+
+La aplicacion de Cono usa de forma dedicada:
+
+```text
+http://127.0.0.1:8502
+```
+
+Esto evita conflictos con otras aplicaciones Streamlit del proyecto Memoria
+que pueden estar ejecutandose en el puerto `8501`.
 
 La app guarda:
 

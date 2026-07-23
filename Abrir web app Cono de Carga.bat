@@ -5,6 +5,9 @@ chcp 65001 >nul
 set "ROOT=%~dp0"
 if "%ROOT:~-1%"=="\" set "ROOT=%ROOT:~0,-1%"
 cd /d "%ROOT%"
+set "APP_HOST=127.0.0.1"
+set "APP_PORT=8502"
+set "APP_URL=http://%APP_HOST%:%APP_PORT%"
 
 echo ==========================================
 echo Cono de Carga - Web App
@@ -71,10 +74,14 @@ if errorlevel 1 (
 echo.
 echo Abriendo web app en el navegador...
 echo Si el navegador no se abre solo, entra a:
-echo http://localhost:8501
+echo %APP_URL%
 echo.
 
-"%PYTHON%" -m streamlit run "web_app\app.py"
+"%PYTHON%" -m streamlit run "web_app\app.py" ^
+  --server.address "%APP_HOST%" ^
+  --server.port "%APP_PORT%" ^
+  --server.headless false ^
+  --browser.gatherUsageStats false
 
 echo.
 echo La web app se cerro o Streamlit termino.

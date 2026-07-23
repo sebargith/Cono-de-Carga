@@ -921,7 +921,9 @@ El lanzador:
 - crea `web_app\.venv` si falta;
 - instala dependencias si falta Streamlit;
 - intenta levantar Docker;
-- abre Streamlit en `http://localhost:8501`.
+- abre Streamlit en `http://127.0.0.1:8502`;
+- utiliza un puerto separado para no interferir con la aplicacion de
+  Granulometria, que puede estar ejecutandose en `8501`.
 
 Estado importante: la web app usa el modelo por defecto definido en `run_pipeline_from_videos.py`, es decir, el YOLOv8n-seg original. Todavía no permite elegir el modelo Psinet ni su clase `material`.
 
@@ -1261,7 +1263,7 @@ Opción manual:
 ```powershell
 cd D:\Memoria\Cono
 .\web_app\.venv\Scripts\Activate.ps1
-streamlit run web_app\app.py
+streamlit run web_app\app.py --server.address 127.0.0.1 --server.port 8502
 ```
 
 ## 16. Estado de validación y pruebas
