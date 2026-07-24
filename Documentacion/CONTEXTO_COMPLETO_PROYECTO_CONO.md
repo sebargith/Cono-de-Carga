@@ -1018,7 +1018,7 @@ El evaluador genera:
 - `distribuciones_geometricas.csv`, con los valores por imagen usados para estudiar cada distribución;
 - `resumen_evaluacion.json`;
 - matriz de confusión;
-- reporte PNG con exactitud, matriz de confusión, indicadores geométricos y tiempos de percepción;
+- reporte PNG con exactitud, matriz de confusión e indicadores geométricos;
 - originales y overlays por clase esperada.
 
 ### 12.3 Evolución de sensibilidad con YOLO original
@@ -1178,8 +1178,7 @@ Cada carpeta por clase esperada conserva las imágenes y overlays correspondient
 - resumen global y exactitud por clase;
 - matriz de confusión;
 - tabla de indicadores geométricos por clase;
-- umbrales analíticos usados;
-- tiempos de inferencia y generación de máscaras.
+- umbrales analíticos usados.
 
 Algunos CSV pueden contener rutas históricas anteriores al cambio de nombre de carpeta. Si se mueven resultados, regenerar o normalizar paths antes de reutilizar scripts.
 

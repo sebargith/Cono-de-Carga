@@ -301,17 +301,8 @@ def indicator_stat_text(metrics: dict[str, Any], expected: str, indicator: str) 
     return f"{float(median):.3f}"
 
 
-def timing_value(metrics: dict[str, Any], key: str) -> float | None:
-    value = metrics.get("timings", {}).get(key)
-    try:
-        number = float(value)
-    except (TypeError, ValueError):
-        return None
-    return number if math.isfinite(number) else None
-
-
 def draw_report(metrics: dict[str, Any], output_path: Path) -> None:
-    width, height = 1600, 1650
+    width, height = 1600, 1480
     canvas = np.full((height, width, 3), 248, dtype=np.uint8)
     dark = (35, 35, 35)
     muted = (100, 100, 100)
@@ -569,69 +560,6 @@ def draw_report(metrics: dict[str, Any], output_path: Path) -> None:
         1,
     )
 
-    cv2.putText(
-        canvas,
-        "Rendimiento de percepcion",
-        (70, 1470),
-        cv2.FONT_HERSHEY_SIMPLEX,
-        0.9,
-        dark,
-        2,
-    )
-    timing_cards = [
-        (
-            "Inferencia YOLO por imagen",
-            timing_value(metrics, "inference_mean_ms_per_image"),
-            "ms",
-        ),
-        (
-            "Inferencia YOLO acumulada",
-            timing_value(metrics, "inference_total_ms"),
-            "ms",
-        ),
-        (
-            "Generacion completa de mascaras",
-            timing_value(metrics, "prediction_wall_seconds"),
-            "s",
-        ),
-    ]
-    timing_y, timing_h, timing_gap = 1495, 110, 24
-    timing_w = (width - 140 - timing_gap * 2) // 3
-    for index, (label, value, unit) in enumerate(timing_cards):
-        x = 70 + index * (timing_w + timing_gap)
-        cv2.rectangle(
-            canvas,
-            (x, timing_y),
-            (x + timing_w, timing_y + timing_h),
-            (255, 255, 255),
-            -1,
-        )
-        cv2.rectangle(
-            canvas,
-            (x, timing_y),
-            (x + timing_w, timing_y + timing_h),
-            (220, 220, 220),
-            1,
-        )
-        cv2.putText(
-            canvas,
-            label,
-            (x + 18, timing_y + 34),
-            cv2.FONT_HERSHEY_SIMPLEX,
-            0.52,
-            muted,
-            1,
-        )
-        value_text = "no disponible" if value is None else f"{value:.1f} {unit}"
-        cv2.putText(
-            canvas,
-            value_text,
-            (x + 18, timing_y + 82),
-            cv2.FONT_HERSHEY_SIMPLEX,
-            0.85,
-            blue,
-            2,
-        )
     write_image(output_path, canvas)
 
 
