@@ -94,9 +94,12 @@ La seccion `Estadisticas` muestra para los frames validos:
 - `area_symmetry`: diferencia relativa entre las areas visibles derecha e izquierda;
 - `centroid_x_norm`: posicion relativa del centroide de la mascara.
 
-Para cada indicador se informan P25, mediana y P75, junto con su histograma. Los
-valores describen la forma visible dentro de la propia carga segmentada; no
-representan centro de masa real ni balance fisico del camion.
+La interfaz muestra un valor representativo por indicador: la mediana de los
+frames validos, acompañada por una lectura directa y una escala horizontal. Los
+percentiles P25/P75 y los histogramas tabulados se conservan en los CSV
+descargables para analisis detallado. Los valores describen la forma visible
+dentro de la propia carga segmentada; no representan centro de masa real ni
+balance fisico del camion.
 
 Las tarjetas usan los umbrales guardados en `pipeline_summary.json`:
 

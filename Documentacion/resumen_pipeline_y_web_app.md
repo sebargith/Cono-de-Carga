@@ -130,6 +130,10 @@ Estas variables describen la distribucion visual interna de la carga
 segmentada. Sus signos indican tendencia hacia izquierda o derecha respecto de
 la propia mascara, no balance fisico ni distribucion real del payload.
 
+La web muestra solamente la mediana de cada indicador, una interpretacion
+directa y su posicion en una escala horizontal. P25, P75 e histogramas quedan
+en los CSV descargables como respaldo para analisis mas detallados.
+
 ## 2. Web app
 
 La web app esta en:

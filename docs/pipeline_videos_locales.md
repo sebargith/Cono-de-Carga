@@ -134,6 +134,10 @@ completa como para cada video. `statistics\indicator_distributions.csv`
 entrega sus histogramas tabulados en 20 intervalos. Solo se consideran frames
 validos.
 
+La presentacion resumida usa solamente la mediana de cada indicador y su
+interpretacion izquierda, centro o derecha. P25, P75 y los histogramas quedan
+como respaldo numerico en estos CSV y no se muestran en la vista principal.
+
 `pipeline_summary.json` registra tambien:
 
 - los umbrales efectivos de pico y simetria usados por el analitico;

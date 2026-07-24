@@ -836,6 +836,11 @@ laterales, mientras que `area_symmetry` usa `-0.07` y `0.07`.
 `centroid_x_norm` se informa en su rango teorico `[-0.5, 0.5]` como indicador
 descriptivo y no como regla independiente del veredicto.
 
+Para mantener una lectura simple, la interfaz presenta solo la mediana de cada
+indicador, su interpretacion y una escala horizontal. P25, P75 e histogramas no
+se muestran en la vista principal, pero se conservan en los CSV para analisis
+estadistico y trazabilidad.
+
 El script YOLO registra los tiempos entregados por Ultralytics: inferencia
 media por frame, inferencia acumulada, preproceso y postproceso. Tambien mide el
 tiempo de pared de la generacion de mascaras. Estos valores se copian a
@@ -1122,15 +1127,18 @@ Los resultados por clase también se reprodujeron:
 | Izquierda | 28/30 | 93,33 % |
 | Derecha | 30/30 | 100,00 % |
 
-El reporte ampliado resume la distribución de tres indicadores respecto de la clase visual esperada:
+El reporte ampliado resume tres indicadores respecto de la clase visual esperada mediante un valor representativo por clase:
 
-| Clase esperada | Pico relativo: mediana [P25, P75] | Simetría de área: mediana [P25, P75] | Centroide relativo: mediana [P25, P75] |
+| Clase esperada | Pico mediano | Simetría mediana | Centroide mediano |
 |---|---:|---:|---:|
-| Centrado | -0,004 [-0,020; 0,025] | 0,024 [-0,037; 0,034] | 0,007 [-0,011; 0,011] |
-| Izquierda | -0,138 [-0,163; -0,095] | -0,179 [-0,216; -0,118] | -0,051 [-0,064; -0,033] |
-| Derecha | 0,109 [0,087; 0,143] | 0,172 [0,146; 0,192] | 0,050 [0,038; 0,057] |
+| Centrado | -0,004 | 0,024 | 0,007 |
+| Izquierda | -0,138 | -0,179 | -0,051 |
+| Derecha | 0,109 | 0,172 | 0,050 |
 
 Estos valores muestran una separación consistente entre las tres clases. El centroide presenta menor amplitud que el pico y la simetría de área, por lo que se conserva como indicador descriptivo y no como variable principal de las reglas de decisión.
+
+P25 y P75 permanecen disponibles en `indicadores_geometricos.csv`, pero se
+retiraron de la imagen resumen para reducir densidad visual.
 
 El resumen de rendimiento de percepción para las 90 imágenes fue:
 

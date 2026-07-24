@@ -130,9 +130,79 @@ st.markdown(
         font-size: 0.82rem;
         line-height: 1.35;
     }
+    .indicator-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 12px;
+        margin: 0.75rem 0 1rem;
+    }
+    .indicator-card {
+        min-height: 150px;
+        padding: 1rem 1.1rem;
+        border: 1px solid rgba(164, 185, 194, 0.28);
+        border-radius: 7px;
+        background: rgb(24, 36, 42);
+    }
+    .indicator-card-head {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 1rem;
+    }
+    .indicator-card-label {
+        color: rgba(250, 250, 250, 0.94);
+        font-size: 0.92rem;
+        font-weight: 700;
+    }
+    .indicator-card-value {
+        color: rgb(250, 250, 250);
+        font-size: 1.65rem;
+        line-height: 1;
+    }
+    .indicator-card-reading {
+        min-height: 2.4rem;
+        padding-top: 0.75rem;
+        color: rgb(187, 219, 236);
+        font-size: 0.86rem;
+        line-height: 1.35;
+    }
+    .indicator-scale {
+        position: relative;
+        height: 8px;
+        margin-top: 0.8rem;
+        border-radius: 4px;
+        background: rgb(68, 86, 94);
+    }
+    .indicator-scale-center {
+        position: absolute;
+        left: 50%;
+        top: -4px;
+        width: 1px;
+        height: 16px;
+        background: rgba(250, 250, 250, 0.65);
+    }
+    .indicator-scale-marker {
+        position: absolute;
+        top: -5px;
+        width: 5px;
+        height: 18px;
+        border-radius: 2px;
+        background: rgb(240, 194, 75);
+        transform: translateX(-50%);
+    }
+    .indicator-scale-labels {
+        display: flex;
+        justify-content: space-between;
+        padding-top: 0.35rem;
+        color: rgba(250, 250, 250, 0.55);
+        font-size: 0.7rem;
+    }
     @media (max-width: 1050px) {
         .video-metric-grid {
             grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+        .indicator-grid {
+            grid-template-columns: minmax(0, 1fr);
         }
     }
     @media (max-width: 620px) {
@@ -307,82 +377,115 @@ def valid_indicator_values(features_df: pd.DataFrame, indicator: str) -> pd.Seri
     return pd.to_numeric(valid[indicator], errors="coerce").dropna()
 
 
-def render_indicator_summary(video: pd.Series | None, features_df: pd.DataFrame) -> None:
-    rows = []
-    for indicator, config in INDICATOR_CONFIG.items():
-        values = valid_indicator_values(features_df, indicator)
-        if video is not None:
-            p25 = numeric_value(video.get(f"p25_{indicator}"), float("nan"))
-            median = numeric_value(video.get(f"median_{indicator}"), float("nan"))
-            p75 = numeric_value(video.get(f"p75_{indicator}"), float("nan"))
-        elif values.empty:
-            p25 = median = p75 = float("nan")
-        else:
-            p25, median, p75 = values.quantile([0.25, 0.50, 0.75]).tolist()
-        rows.append(
-            {
-                "Indicador": config["label"],
-                "Mediana": median,
-                "Rango central (P25 - P75)": f"{p25:.4f} a {p75:.4f}",
-            }
-        )
-    table = pd.DataFrame(rows)
-    table["Mediana"] = pd.to_numeric(table["Mediana"], errors="coerce").round(4)
-    st.dataframe(table, use_container_width=True, hide_index=True)
-    st.caption(
-        "Negativo indica tendencia visual interna hacia la izquierda; positivo, "
-        "hacia la derecha. El rango central contiene la mitad intermedia de los frames validos."
+def indicator_median(
+    video: pd.Series | None,
+    features_df: pd.DataFrame,
+    indicator: str,
+) -> float | None:
+    if video is not None:
+        stored = optional_numeric_value(video.get(f"median_{indicator}"))
+        if stored is not None:
+            return stored
+    values = valid_indicator_values(features_df, indicator)
+    if values.empty:
+        return None
+    return float(values.median())
+
+
+def indicator_interpretation(
+    indicator: str,
+    value: float | None,
+    threshold_peak: float,
+    threshold_area: float,
+) -> str:
+    if value is None:
+        return "Sin datos validos."
+    if indicator == "peak_x_norm":
+        if value < -threshold_peak:
+            return "Pico principal hacia la izquierda."
+        if value > threshold_peak:
+            return "Pico principal hacia la derecha."
+        return "Pico principal dentro de la zona central."
+    if indicator == "area_symmetry":
+        if value < -threshold_area:
+            return "Mayor presencia visual interna a la izquierda."
+        if value > threshold_area:
+            return "Mayor presencia visual interna a la derecha."
+        return "Areas visibles internamente similares."
+    if abs(value) < 0.02:
+        return "Centroide visual cercano al centro interno."
+    side = "izquierda" if value < 0 else "derecha"
+    return f"Centroide visual levemente hacia la {side}."
+
+
+def indicator_card(
+    label: str,
+    value: float | None,
+    interpretation: str,
+    minimum: float,
+    maximum: float,
+) -> str:
+    value_text = "N/D" if value is None else f"{value:.3f}"
+    marker_value = 0.0 if value is None else min(max(value, minimum), maximum)
+    marker_position = (marker_value - minimum) / (maximum - minimum) * 100.0
+    marker_style = "" if value is not None else "opacity: 0;"
+    return (
+        '<div class="indicator-card">'
+        '<div class="indicator-card-head">'
+        f'<div class="indicator-card-label">{html.escape(label)}</div>'
+        f'<div class="indicator-card-value">{html.escape(value_text)}</div>'
+        "</div>"
+        f'<div class="indicator-card-reading">{html.escape(interpretation)}</div>'
+        '<div class="indicator-scale">'
+        '<div class="indicator-scale-center"></div>'
+        f'<div class="indicator-scale-marker" style="left: {marker_position:.2f}%; '
+        f'{marker_style}"></div>'
+        "</div>"
+        '<div class="indicator-scale-labels">'
+        f"<span>{minimum:g}</span><span>0</span><span>{maximum:g}</span>"
+        "</div>"
+        "</div>"
     )
 
 
-def render_indicator_distributions(features_df: pd.DataFrame) -> None:
-    with st.expander("Ver distribuciones de los indicadores"):
-        columns = st.columns(3)
-        for column, (indicator, config) in zip(columns, INDICATOR_CONFIG.items()):
-            with column:
-                st.markdown(f"**{config['label']}**")
-                values = valid_indicator_values(features_df, indicator)
-                if values.empty:
-                    st.write("Sin datos validos.")
-                    continue
-                minimum, maximum = config["range"]
-                clipped = values.clip(lower=minimum, upper=maximum)
-                observed_min = float(clipped.min())
-                observed_max = float(clipped.max())
-                observed_span = observed_max - observed_min
-                padding = max(observed_span * 0.15, (maximum - minimum) * 0.02)
-                chart_min = max(minimum, observed_min - padding)
-                chart_max = min(maximum, observed_max + padding)
-                if chart_max <= chart_min:
-                    chart_min = max(minimum, observed_min - padding)
-                    chart_max = min(maximum, observed_max + padding)
-                bin_count = min(8, max(3, int(len(values) ** 0.5) + 1))
-                bin_width = (chart_max - chart_min) / bin_count
-                bin_edges = [
-                    chart_min + index * bin_width for index in range(bin_count + 1)
-                ]
-                intervals = pd.cut(
-                    clipped,
-                    bins=bin_edges,
-                    include_lowest=True,
-                )
-                counts = intervals.value_counts(sort=False)
-                labels = [
-                    f"{bin_edges[index]:.3f} a {bin_edges[index + 1]:.3f}"
-                    for index in range(bin_count)
-                ]
-                chart = pd.DataFrame(
-                    {
-                        "intervalo": labels,
-                        "frames": counts.values,
-                    }
-                ).set_index("intervalo")
-                st.bar_chart(chart, height=220)
-        st.caption(
-            "La escala visual se ajusta al rango observado y considera solo frames "
-            "validos. Los CSV mantienen histogramas fijos de 20 intervalos para "
-            "analisis y comparacion."
+def render_indicator_summary(
+    video: pd.Series | None,
+    features_df: pd.DataFrame,
+    summary: dict,
+) -> None:
+    analytic_rules = summary.get("analytic_rules", {})
+    if not isinstance(analytic_rules, dict):
+        analytic_rules = {}
+    threshold_peak = numeric_value(analytic_rules.get("threshold_peak"), 0.06)
+    threshold_area = numeric_value(analytic_rules.get("threshold_area"), 0.07)
+    cards = []
+    for indicator, config in INDICATOR_CONFIG.items():
+        value = indicator_median(video, features_df, indicator)
+        interpretation = indicator_interpretation(
+            indicator,
+            value,
+            threshold_peak,
+            threshold_area,
         )
+        minimum, maximum = config["range"]
+        cards.append(
+            indicator_card(
+                config["label"],
+                value,
+                interpretation,
+                minimum,
+                maximum,
+            )
+        )
+    st.markdown(
+        '<div class="indicator-grid">' + "".join(cards) + "</div>",
+        unsafe_allow_html=True,
+    )
+    st.caption(
+        "Se muestra la mediana de los frames validos. Los valores negativos indican "
+        "tendencia visual interna hacia la izquierda y los positivos, hacia la derecha. "
+        "Los percentiles y distribuciones detalladas permanecen en los CSV descargables."
+    )
 
 
 def render_frame_details(features_df: pd.DataFrame) -> None:
@@ -412,17 +515,12 @@ def metric_card(
     )
 
 
-def render_verdict(video: pd.Series | None, summary: dict) -> None:
+def render_verdict(video: pd.Series | None) -> None:
     st.subheader("Indicadores generales del video")
     if video is None:
         st.write("Sin veredicto disponible.")
         return
 
-    analytic_rules = summary.get("analytic_rules", {})
-    if not isinstance(analytic_rules, dict):
-        analytic_rules = {}
-    threshold_peak = numeric_value(analytic_rules.get("threshold_peak"), 0.06)
-    threshold_area = numeric_value(analytic_rules.get("threshold_area"), 0.07)
     final_verdict = text_value(video.get("final_verdict"), "sin_veredicto")
     label = VERDICT_LABELS.get(final_verdict, final_verdict)
     confidence = numeric_value(video.get("confidence")) * 100.0
@@ -468,32 +566,6 @@ def render_verdict(video: pd.Series | None, summary: dict) -> None:
             label.upper(),
             "Posibles: centrada, izquierda, derecha, mixta o no evaluable.",
             text_value=True,
-        ),
-        metric_card(
-            "Pico relativo mediano",
-            f"{numeric_value(video.get('median_peak_x_norm')):.3f}",
-            (
-                f"Rango -0.5 a 0.5: < -{threshold_peak:.2f} izquierda; "
-                f"-{threshold_peak:.2f} a {threshold_peak:.2f} centro; "
-                f"> {threshold_peak:.2f} derecha."
-            ),
-        ),
-        metric_card(
-            "Simetria interna mediana",
-            f"{numeric_value(video.get('median_area_symmetry')):.3f}",
-            (
-                f"Rango -1 a 1: < -{threshold_area:.2f} izquierda; "
-                f"-{threshold_area:.2f} a {threshold_area:.2f} simetrica; "
-                f"> {threshold_area:.2f} derecha."
-            ),
-        ),
-        metric_card(
-            "Centroide relativo mediano",
-            f"{numeric_value(video.get('median_centroid_x_norm')):.3f}",
-            (
-                "Rango -0.5 a 0.5: negativo es izquierda, 0 es centro y positivo "
-                "es derecha. Es descriptivo."
-            ),
         ),
         metric_card(
             "Frames evaluables",
@@ -542,10 +614,13 @@ def render_inference_time(summary: dict) -> None:
     )
 
 
-def render_statistics(video: pd.Series | None, features_df: pd.DataFrame) -> None:
-    st.subheader("Distribucion de los indicadores")
-    render_indicator_summary(video, features_df)
-    render_indicator_distributions(features_df)
+def render_statistics(
+    video: pd.Series | None,
+    features_df: pd.DataFrame,
+    summary: dict,
+) -> None:
+    st.subheader("Forma visible de la carga")
+    render_indicator_summary(video, features_df, summary)
     render_frame_details(features_df)
 
 
@@ -694,9 +769,9 @@ if active_overlays:
 else:
     st.write("Sin overlays.")
 
-render_verdict(video, summary)
+render_verdict(video)
 render_inference_time(summary)
-render_statistics(video, active_features)
+render_statistics(video, active_features, summary)
 
 st.subheader("Descargas")
 download_cols = st.columns(3)

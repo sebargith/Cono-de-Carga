@@ -296,11 +296,9 @@ def indicator_stat_text(metrics: dict[str, Any], expected: str, indicator: str) 
         .get(indicator, {})
     )
     median = stats.get("median")
-    p25 = stats.get("p25")
-    p75 = stats.get("p75")
-    if median is None or p25 is None or p75 is None:
+    if median is None:
         return "sin datos"
-    return f"{float(median):.3f} [{float(p25):.3f}, {float(p75):.3f}]"
+    return f"{float(median):.3f}"
 
 
 def timing_value(metrics: dict[str, Any], key: str) -> float | None:
@@ -464,7 +462,7 @@ def draw_report(metrics: dict[str, Any], output_path: Path) -> None:
     )
     cv2.putText(
         canvas,
-        "Cada celda muestra mediana [P25, P75] calculada sobre frames validos.",
+        "Cada valor es la mediana de los frames validos de la clase.",
         (70, 1090),
         cv2.FONT_HERSHEY_SIMPLEX,
         0.55,
@@ -477,9 +475,9 @@ def draw_report(metrics: dict[str, Any], output_path: Path) -> None:
     header_h, row_h = 55, 72
     headers = (
         ("Clase esperada", row_label_w),
-        ("Pico relativo", indicator_w),
-        ("Simetria interna", indicator_w),
-        ("Centroide relativo", indicator_w),
+        ("Pico mediano", indicator_w),
+        ("Simetria mediana", indicator_w),
+        ("Centroide mediano", indicator_w),
     )
     current_x = table_x
     for header, column_width in headers:

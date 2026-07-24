@@ -369,7 +369,7 @@ Ese archivo resume, por video:
 - ratio de frames centrados,
 - ratio de frames izquierda,
 - ratio de frames derecha,
-- P25, mediana, P75 y media de las variables geometricas principales,
+- mediana de las variables geometricas principales como resumen visible,
 - veredicto final,
 - confianza del veredicto.
 
@@ -390,6 +390,10 @@ El primer archivo entrega P25, mediana y P75 por corrida y por video. El
 segundo entrega histogramas tabulados de 20 intervalos. Solo se consideran
 frames validos. Estos resultados caracterizan la forma visible de la carga,
 sin interpretarlos como centro de masa real o balance fisico del camion.
+
+Para evitar sobrecargar la presentacion, la aplicacion y el reporte visual
+muestran solo la mediana con una interpretacion directa. Los percentiles y los
+histogramas permanecen disponibles en los archivos anteriores.
 
 El veredicto final puede quedar como:
 
