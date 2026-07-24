@@ -158,6 +158,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--imgsz", type=int, default=None)
     parser.add_argument("--device", default="0")
     parser.add_argument(
+        "--class-id",
+        type=int,
+        default=None,
+        help="Clase YOLO que representa la carga. Por defecto usa la configuracion.",
+    )
+    parser.add_argument(
         "--mask-mode",
         choices=("largest", "merge_all"),
         default="largest",
@@ -476,6 +482,7 @@ def run_yolo_masks(
     device: str,
     mask_mode: str,
     start_docker: bool,
+    class_id: int | None = None,
 ) -> None:
     if start_docker:
         run_command(["docker", "compose", "up", "-d"], perception_dir, "levantar Docker")
@@ -504,6 +511,8 @@ def run_yolo_masks(
     ]
     if imgsz is not None:
         command.extend(["--imgsz", str(imgsz)])
+    if class_id is not None:
+        command.extend(["--class-id", str(class_id)])
 
     run_command(command, perception_dir, "YOLO a mascaras analiticas")
 
@@ -957,6 +966,7 @@ def main() -> int:
         device=args.device,
         mask_mode=args.mask_mode,
         start_docker=args.start_docker,
+        class_id=args.class_id,
     )
 
     copy_if_exists(masks_dir / "manifest.csv", manifests_dir / "yolo_manifest.csv")
@@ -1020,6 +1030,7 @@ def main() -> int:
         "conf": args.conf,
         "device": args.device,
         "mask_mode": args.mask_mode,
+        "class_id": args.class_id,
         "interval_seconds": max(float(args.interval_seconds), 0.0),
         "analytic_rules": {
             "threshold_peak": float(

@@ -1009,9 +1009,11 @@ scripts\create_technical_comparisons.py
 El evaluador genera:
 
 - `evaluacion_por_imagen.csv`;
+- `indicadores_geometricos.csv`, con P25, mediana y P75 por clase esperada;
+- `distribuciones_geometricas.csv`, con los valores por imagen usados para estudiar cada distribución;
 - `resumen_evaluacion.json`;
 - matriz de confusión;
-- reporte PNG;
+- reporte PNG con exactitud, matriz de confusión, indicadores geométricos y tiempos de percepción;
 - originales y overlays por clase esperada.
 
 ### 12.3 Evolución de sensibilidad con YOLO original
@@ -1101,12 +1103,51 @@ Derecha: 30/30 = 100,00 %
 
 El modelo Psinet mejoró 17 imágenes y 18,89 puntos porcentuales respecto de la mejor corrida con el YOLO original.
 
-### 12.5 Ruta actual de resultados
+### 12.5 Repetición con indicadores geométricos
 
-La carpeta fue reorganizada después de las corridas. La ruta vigente observada es:
+El 23 de julio de 2026 se repitió la prueba completa con la misma configuración del modelo Psinet para comprobar la reproducibilidad e incorporar los nuevos indicadores al reporte. La corrida obtuvo nuevamente:
 
 ```text
-D:\Memoria\Cono\outputs\prueba_tecnica\prueba_tecnica
+90/90 imágenes con predicción YOLO
+90/90 imágenes evaluables
+80/90 clasificaciones correctas
+88,89 % de exactitud
+```
+
+Los resultados por clase también se reprodujeron:
+
+| Clase esperada | Correctas | Exactitud |
+|---|---:|---:|
+| Centrado | 22/30 | 73,33 % |
+| Izquierda | 28/30 | 93,33 % |
+| Derecha | 30/30 | 100,00 % |
+
+El reporte ampliado resume la distribución de tres indicadores respecto de la clase visual esperada:
+
+| Clase esperada | Pico relativo: mediana [P25, P75] | Simetría de área: mediana [P25, P75] | Centroide relativo: mediana [P25, P75] |
+|---|---:|---:|---:|
+| Centrado | -0,004 [-0,020; 0,025] | 0,024 [-0,037; 0,034] | 0,007 [-0,011; 0,011] |
+| Izquierda | -0,138 [-0,163; -0,095] | -0,179 [-0,216; -0,118] | -0,051 [-0,064; -0,033] |
+| Derecha | 0,109 [0,087; 0,143] | 0,172 [0,146; 0,192] | 0,050 [0,038; 0,057] |
+
+Estos valores muestran una separación consistente entre las tres clases. El centroide presenta menor amplitud que el pico y la simetría de área, por lo que se conserva como indicador descriptivo y no como variable principal de las reglas de decisión.
+
+El resumen de rendimiento de percepción para las 90 imágenes fue:
+
+```text
+inferencia YOLO acumulada: 1,673 s
+inferencia YOLO media: 18,59 ms/imagen
+generación completa de máscaras: 20,23 s
+```
+
+La generación completa incluye carga de imágenes, preprocesamiento, inferencia, postprocesamiento y escritura de máscaras; por ello es mayor que el tiempo puro de inferencia reportado por YOLO.
+
+### 12.6 Ruta actual de resultados
+
+La repetición con indicadores quedó en:
+
+```text
+D:\Memoria\Cono\outputs\prueba_tecnica\prueba_tecnica_psinet_indicadores_20260723
 ```
 
 Contiene:
@@ -1114,19 +1155,23 @@ Contiene:
 ```text
 analytic\
 evaluacion\
-evaluacion\comparaciones_por_clase\Centrado
-evaluacion\comparaciones_por_clase\Izquierda
-evaluacion\comparaciones_por_clase\Derecha
+evaluacion\evaluacion_por_imagen.csv
+evaluacion\indicadores_geometricos.csv
+evaluacion\distribuciones_geometricas.csv
+evaluacion\resumen_evaluacion.json
+evaluacion\reporte_prueba_tecnica.png
+evaluacion\por_clase_esperada\Centrado
+evaluacion\por_clase_esperada\Izquierda
+evaluacion\por_clase_esperada\Derecha
 ```
 
-Cada carpeta de comparaciones contiene 30 composiciones lado a lado con:
+Cada carpeta por clase esperada conserva las imágenes y overlays correspondientes. El reporte PNG combina:
 
-- clase esperada;
-- predicción;
-- frame original;
-- overlay;
-- estado correcto/incorrecto;
-- métricas principales.
+- resumen global y exactitud por clase;
+- matriz de confusión;
+- tabla de indicadores geométricos por clase;
+- umbrales analíticos usados;
+- tiempos de inferencia y generación de máscaras.
 
 Algunos CSV pueden contener rutas históricas anteriores al cambio de nombre de carpeta. Si se mueven resultados, regenerar o normalizar paths antes de reutilizar scripts.
 

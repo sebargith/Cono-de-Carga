@@ -115,6 +115,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--imgsz", type=int, default=None)
     parser.add_argument("--device", default="0")
     parser.add_argument(
+        "--class-id",
+        type=int,
+        default=None,
+        help="Clase YOLO que representa la carga. Por defecto usa la configuracion.",
+    )
+    parser.add_argument(
         "--mask-mode",
         choices=("largest", "merge_all"),
         default="largest",
@@ -508,6 +514,7 @@ def build_summary(
             "imgsz": args.imgsz,
             "device": args.device,
             "mask_mode": args.mask_mode,
+            "class_id": args.class_id,
         },
         "paths": paths,
     }
@@ -575,6 +582,7 @@ def main() -> int:
         device=str(args.device),
         mask_mode=args.mask_mode,
         start_docker=bool(args.start_docker),
+        class_id=args.class_id,
     )
     run_analytic(
         frames_dir=staged_images_dir,

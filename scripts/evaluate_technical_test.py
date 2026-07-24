@@ -52,6 +52,13 @@ def parse_args() -> argparse.Namespace:
         help="Directorio donde se guardara la evaluacion y el reporte.",
     )
     parser.add_argument(
+        "--yolo-summary",
+        default=None,
+        help="summary.json de YOLO para incorporar tiempos de inferencia.",
+    )
+    parser.add_argument("--threshold-peak", type=float, default=0.06)
+    parser.add_argument("--threshold-area", type=float, default=0.07)
+    parser.add_argument(
         "--overwrite",
         action="store_true",
         help="Reemplaza la evaluacion previa si ya existe.",
@@ -101,6 +108,14 @@ def write_image(path: Path, image: np.ndarray) -> None:
 def read_rows(features_csv: Path) -> list[dict[str, str]]:
     with features_csv.open("r", newline="", encoding="utf-8-sig") as handle:
         return list(csv.DictReader(handle))
+
+
+def read_json_dict(path: Path) -> dict[str, Any]:
+    if not path.exists():
+        return {}
+    with path.open("r", encoding="utf-8") as handle:
+        data = json.load(handle)
+    return data if isinstance(data, dict) else {}
 
 
 def prepare_output_dir(output_dir: Path, overwrite: bool) -> None:
@@ -273,8 +288,32 @@ def centered_text(
     )
 
 
+def indicator_stat_text(metrics: dict[str, Any], expected: str, indicator: str) -> str:
+    stats = (
+        metrics.get("per_class", {})
+        .get(expected, {})
+        .get("indicator_statistics", {})
+        .get(indicator, {})
+    )
+    median = stats.get("median")
+    p25 = stats.get("p25")
+    p75 = stats.get("p75")
+    if median is None or p25 is None or p75 is None:
+        return "sin datos"
+    return f"{float(median):.3f} [{float(p25):.3f}, {float(p75):.3f}]"
+
+
+def timing_value(metrics: dict[str, Any], key: str) -> float | None:
+    value = metrics.get("timings", {}).get(key)
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return None
+    return number if math.isfinite(number) else None
+
+
 def draw_report(metrics: dict[str, Any], output_path: Path) -> None:
-    width, height = 1600, 1050
+    width, height = 1600, 1650
     canvas = np.full((height, width, 3), 248, dtype=np.uint8)
     dark = (35, 35, 35)
     muted = (100, 100, 100)
@@ -413,6 +452,188 @@ def draw_report(metrics: dict[str, Any], output_path: Path) -> None:
         red,
         1,
     )
+
+    cv2.putText(
+        canvas,
+        "Indicadores geometricos por clase esperada",
+        (70, 1055),
+        cv2.FONT_HERSHEY_SIMPLEX,
+        0.9,
+        dark,
+        2,
+    )
+    cv2.putText(
+        canvas,
+        "Cada celda muestra mediana [P25, P75] calculada sobre frames validos.",
+        (70, 1090),
+        cv2.FONT_HERSHEY_SIMPLEX,
+        0.55,
+        muted,
+        1,
+    )
+
+    table_x, table_y = 70, 1115
+    row_label_w, indicator_w = 220, 430
+    header_h, row_h = 55, 72
+    headers = (
+        ("Clase esperada", row_label_w),
+        ("Pico relativo", indicator_w),
+        ("Simetria interna", indicator_w),
+        ("Centroide relativo", indicator_w),
+    )
+    current_x = table_x
+    for header, column_width in headers:
+        cv2.rectangle(
+            canvas,
+            (current_x, table_y),
+            (current_x + column_width, table_y + header_h),
+            (235, 239, 241),
+            -1,
+        )
+        cv2.rectangle(
+            canvas,
+            (current_x, table_y),
+            (current_x + column_width, table_y + header_h),
+            (205, 210, 212),
+            1,
+        )
+        cv2.putText(
+            canvas,
+            header,
+            (current_x + 14, table_y + 35),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.52,
+            dark,
+            1,
+        )
+        current_x += column_width
+
+    indicator_names = ("peak_x_norm", "area_symmetry", "centroid_x_norm")
+    for row_index, expected in enumerate(EXPECTED_CLASSES):
+        y1 = table_y + header_h + row_index * row_h
+        current_x = table_x
+        values = [DISPLAY_NAMES[expected]]
+        values.extend(
+            indicator_stat_text(metrics, expected, indicator)
+            for indicator in indicator_names
+        )
+        for column_index, ((_, column_width), value) in enumerate(
+            zip(headers, values)
+        ):
+            fill = (255, 255, 255) if row_index % 2 == 0 else (248, 249, 250)
+            cv2.rectangle(
+                canvas,
+                (current_x, y1),
+                (current_x + column_width, y1 + row_h),
+                fill,
+                -1,
+            )
+            cv2.rectangle(
+                canvas,
+                (current_x, y1),
+                (current_x + column_width, y1 + row_h),
+                (215, 218, 220),
+                1,
+            )
+            cv2.putText(
+                canvas,
+                value,
+                (current_x + 14, y1 + 45),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.55 if column_index else 0.6,
+                dark,
+                2 if column_index == 0 else 1,
+            )
+            current_x += column_width
+
+    threshold_peak = float(metrics.get("thresholds", {}).get("peak", 0.06))
+    threshold_area = float(metrics.get("thresholds", {}).get("area", 0.07))
+    cv2.putText(
+        canvas,
+        (
+            f"Referencias: pico < -{threshold_peak:.2f} izquierda y "
+            f"> {threshold_peak:.2f} derecha | simetria < -{threshold_area:.2f} "
+            f"izquierda y > {threshold_area:.2f} derecha."
+        ),
+        (70, 1405),
+        cv2.FONT_HERSHEY_SIMPLEX,
+        0.52,
+        muted,
+        1,
+    )
+    cv2.putText(
+        canvas,
+        "El centroide relativo es descriptivo: negativo izquierda, cero centro, positivo derecha.",
+        (70, 1432),
+        cv2.FONT_HERSHEY_SIMPLEX,
+        0.52,
+        muted,
+        1,
+    )
+
+    cv2.putText(
+        canvas,
+        "Rendimiento de percepcion",
+        (70, 1470),
+        cv2.FONT_HERSHEY_SIMPLEX,
+        0.9,
+        dark,
+        2,
+    )
+    timing_cards = [
+        (
+            "Inferencia YOLO por imagen",
+            timing_value(metrics, "inference_mean_ms_per_image"),
+            "ms",
+        ),
+        (
+            "Inferencia YOLO acumulada",
+            timing_value(metrics, "inference_total_ms"),
+            "ms",
+        ),
+        (
+            "Generacion completa de mascaras",
+            timing_value(metrics, "prediction_wall_seconds"),
+            "s",
+        ),
+    ]
+    timing_y, timing_h, timing_gap = 1495, 110, 24
+    timing_w = (width - 140 - timing_gap * 2) // 3
+    for index, (label, value, unit) in enumerate(timing_cards):
+        x = 70 + index * (timing_w + timing_gap)
+        cv2.rectangle(
+            canvas,
+            (x, timing_y),
+            (x + timing_w, timing_y + timing_h),
+            (255, 255, 255),
+            -1,
+        )
+        cv2.rectangle(
+            canvas,
+            (x, timing_y),
+            (x + timing_w, timing_y + timing_h),
+            (220, 220, 220),
+            1,
+        )
+        cv2.putText(
+            canvas,
+            label,
+            (x + 18, timing_y + 34),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.52,
+            muted,
+            1,
+        )
+        value_text = "no disponible" if value is None else f"{value:.1f} {unit}"
+        cv2.putText(
+            canvas,
+            value_text,
+            (x + 18, timing_y + 82),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.85,
+            blue,
+            2,
+        )
     write_image(output_path, canvas)
 
 
@@ -429,6 +650,21 @@ def main() -> int:
         raise ValueError(f"El CSV no contiene resultados: {features_csv}")
     evaluated = copy_outputs(rows, output_dir)
     metrics = build_metrics(evaluated)
+    metrics["thresholds"] = {
+        "peak": float(args.threshold_peak),
+        "area": float(args.threshold_area),
+    }
+    metrics["timings"] = {}
+    if args.yolo_summary:
+        yolo_summary_path = Path(args.yolo_summary).resolve()
+        if not yolo_summary_path.is_file():
+            raise FileNotFoundError(
+                f"No existe yolo-summary: {yolo_summary_path}"
+            )
+        yolo_summary = read_json_dict(yolo_summary_path)
+        yolo_timings = yolo_summary.get("timings", {})
+        if isinstance(yolo_timings, dict):
+            metrics["timings"] = yolo_timings
 
     write_csv(
         output_dir / "evaluacion_por_imagen.csv",
