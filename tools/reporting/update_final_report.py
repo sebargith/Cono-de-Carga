@@ -6,6 +6,7 @@ import zipfile
 from pathlib import Path
 
 from docx import Document
+from docx.oxml.ns import qn
 from docx.shared import Inches
 
 
@@ -73,10 +74,11 @@ PARAGRAPH_REPLACEMENTS = {
         "La implementación integra Python, OpenCV, NumPy, SciPy, Pandas, "
         "Ultralytics, NVIDIA CUDA, MLflow y Streamlit. Docker encapsula el "
         "entrenamiento, mientras la inferencia y el pipeline se ejecutan en un "
-        "entorno Python local. El repositorio "
-        "de percepción registra un entrenamiento reproducible con 240 imágenes "
-        "y conserva su best.pt como checkpoint alternativo. Para la operación "
-        "se seleccionó el modelo principal PSINet. En una prueba técnica "
+        "entorno Python local. El modelo operativo de percepción es el mismo "
+        "checkpoint PSINet utilizado por Granulometría para segmentar la clase "
+        "material. El repositorio de Cono registra además un entrenamiento "
+        "reproducible con 240 imágenes y conserva su best.pt como checkpoint "
+        "alternativo. En una prueba técnica "
         "balanceada de 90 imágenes, el pipeline obtiene 88,89 % de exactitud "
         "global: 73,33 % para centrado, 93,33 % para izquierda y 100 % para "
         "derecha. Las medianas de pico, simetría y centroide son cercanas a "
@@ -92,10 +94,11 @@ PARAGRAPH_REPLACEMENTS = {
         "The implementation combines Python, OpenCV, NumPy, SciPy, Pandas, "
         "Ultralytics, NVIDIA CUDA, MLflow, and Streamlit. Docker encapsulates "
         "training, while inference and the operational pipeline run in a local "
-        "Python environment. The repository "
-        "records a reproducible training run with 240 images and retains its "
-        "best.pt as an alternative checkpoint, while PSINet is used as the "
-        "primary operational segmenter. In a balanced technical evaluation with "
+        "Python environment. The operational perception model is the same "
+        "PSINet checkpoint used by the Granulometry pipeline to segment the "
+        "material class. The Cono repository also records a reproducible "
+        "training run with 240 images and retains its best.pt as an alternative "
+        "checkpoint. In a balanced technical evaluation with "
         "90 visually selected images, the complete pipeline reaches 88.89% "
         "overall accuracy. Median apex, area-symmetry, and centroid indicators "
         "remain close to zero for centered loads, negative for left cases, and "
@@ -103,6 +106,18 @@ PARAGRAPH_REPLACEMENTS = {
         "contains 1,183 evaluable and 65 non-evaluable cases."
     ),
     "5.3 Entrenamiento reproducible": "5.3 Entrenamiento reproducible del checkpoint alternativo",
+    "El etiquetado manual se realiza en CVAT": (
+        "El etiquetado manual preparado en este repositorio corresponde al "
+        "experimento del checkpoint alternativo. Se realiza en CVAT sobre la "
+        "carga visible y se exporta en formato Segmentation Mask: las imágenes "
+        "quedan en JPEGImages, las máscaras en SegmentationClass y las clases "
+        "en labelmap.txt [9]. La clase Carga se codifica con RGB "
+        "[102, 255, 102] y el fondo con [0, 0, 0]. Este conjunto local contiene "
+        "una sola clase de carga y no debe confundirse con el entrenamiento del "
+        "modelo operativo compartido, cuyos pesos contienen las clases "
+        "0: caex y 1: material. En ninguno de los dos casos se dispone de una "
+        "máscara de tolva para el analítico geométrico."
+    ),
     "El entrenamiento parte desde la definición yolov8n-seg.yaml": (
         "El entrenamiento reproducible parte desde yolov8n-seg.yaml, sin pesos "
         "preentrenados. El uso de pretrained=false demuestra que el repositorio "
@@ -130,15 +145,17 @@ PARAGRAPH_REPLACEMENTS = {
         "selección operativa se basó además en el desempeño del pipeline "
         "completo, donde PSINet obtuvo los mejores resultados."
     ),
-    "El modelo fue entrenado para identificar la carga visible": (
-        "El pipeline utiliza como segmentador principal "
-        "perception/models/primary/psinet_carga_visible.pt y selecciona su "
-        "clase material (class_id=1). El checkpoint "
-        "perception/models/alternative/best.pt se mantiene para respaldo y "
-        "comparaciones controladas con su clase Carga (class_id=0). Durante la "
-        "inferencia se aplica una confianza de 0,35 y el modo largest conserva "
-        "la instancia de carga de mayor área. La predicción se rasteriza como "
-        "una única máscara RGB, contrato de entrada del analítico geométrico."
+    "El modelo fue entrenado para identificar la carga visible||El pipeline utiliza como segmentador principal": (
+        "El pipeline usa perception/models/primary/psinet_carga_visible.pt como "
+        "segmentador operativo y selecciona material (class_id=1). El archivo "
+        "es binariamente idéntico al empleado por Granulometría: arquitectura "
+        "YOLOv8m-seg, clases caex/material, imgsz=736 en sus metadatos y SHA256 "
+        "BD7C9880D9A39B291DC03669DAD774DB9FD933D6026DF694EEE1E3A41CBF1DAB. "
+        "La evaluación de Cono usa imgsz=640, confianza 0,35 y modo largest. El "
+        "checkpoint alternativo best.pt queda como respaldo reproducible y usa "
+        "Carga (class_id=0). La predicción se rasteriza como máscara RGB para el "
+        "analítico. Compartir pesos no implica compartir parámetros ni "
+        "postprocesamiento."
     ),
     "Los umbrales se mantienen en el archivo de configuración": (
         "Los umbrales se mantienen en el archivo de configuración para "
@@ -155,6 +172,11 @@ PARAGRAPH_REPLACEMENTS = {
         "durante el análisis. Docker se reserva para el entrenamiento y la "
         "validación reproducibles con GPU."
     ),
+    "2. Se levanta o reutiliza el contenedor de percepción||Se levanta o reutiliza el contenedor de percepción": (
+        "2. El orquestador ejecuta localmente el adaptador de percepción con "
+        "el mismo intérprete Python del pipeline y realiza inferencia YOLO "
+        "sobre el directorio de fotogramas."
+    ),
     "La evaluación se organiza en tres niveles.||La evaluación considera tres niveles:": (
         "La evaluación considera tres niveles: métricas internas del "
         "entrenamiento; una prueba técnica balanceada de 90 imágenes, con 30 "
@@ -165,13 +187,18 @@ PARAGRAPH_REPLACEMENTS = {
     ),
     "Las etiquetas esperadas de la prueba técnica||Las 90 imágenes proceden": (
         "Las 90 imágenes proceden del banco de evidencias CAEX del proyecto de "
-        "Granulometría (data/raw/evidencias_caex/images), una base distinta del "
-        "entrenamiento y formada por registros de fechas posteriores. Se "
+        "Granulometría (data/raw/evidencias_caex/images) y corresponden a "
+        "registros posteriores al conjunto local de 240 imágenes utilizado "
+        "para el checkpoint alternativo. Se "
         "seleccionaron visualmente 30 casos centrados, 30 a izquierda y 30 a "
-        "derecha. Las etiquetas representan apariencia visual, no mediciones "
-        "físicas. La separación temporal reduce el riesgo de reutilizar imágenes "
-        "de entrenamiento, aunque el tamaño y la selección dirigida mantienen el "
-        "resultado como validación técnica local."
+        "derecha. Este conjunto es distinto de la prueba técnica de 90 imágenes "
+        "de Granulometría y no comparte nombres de archivo con ella. Las "
+        "etiquetas representan apariencia visual, no mediciones físicas. La "
+        "separación temporal reduce el riesgo de reutilizar imágenes, aunque la "
+        "independencia respecto del entrenamiento original de PSINet debe quedar "
+        "respaldada por su manifiesto al integrar el informe definitivo. El "
+        "tamaño y la selección dirigida mantienen el resultado como validación "
+        "técnica local."
     ),
     "El modelo de percepción entrenado se evalúa junto": (
         "El modelo principal PSINet se evalúa junto con el analítico sobre las "
@@ -216,13 +243,21 @@ PARAGRAPH_REPLACEMENTS = {
         "pues las reglas geométricas no recuperan regiones omitidas ni remueven "
         "regiones incorrectas sin información adicional."
     ),
-    "La prueba técnica tiene 90 imágenes seleccionadas": (
+    "La prueba técnica tiene 90 imágenes seleccionadas||La prueba técnica se limita a 90 imágenes seleccionadas visualmente.": (
         "La prueba técnica se limita a 90 imágenes seleccionadas visualmente. "
-        "Aunque proceden de una base distinta y de fechas posteriores al "
-        "conjunto usado para entrenar el segmentador, su tamaño y selección "
-        "balanceada no reemplazan una evaluación prospectiva por secuencias "
-        "completas, eventos independientes y condiciones operacionales más "
-        "diversas."
+        "Proceden de fechas posteriores y son independientes del conjunto local "
+        "de 240 imágenes usado para entrenar el checkpoint alternativo. No "
+        "obstante, la independencia respecto del dataset original del modelo "
+        "PSINet debe confirmarse mediante un manifiesto común. Su tamaño y "
+        "selección balanceada no reemplazan una evaluación prospectiva por "
+        "secuencias completas, eventos independientes y condiciones "
+        "operacionales más diversas."
+    ),
+    "Los subconjuntos de 240 imágenes no documentan": (
+        "Los subconjuntos de 240 imágenes utilizados para entrenar el "
+        "checkpoint alternativo no documentan separación por evento o video, "
+        "lo que puede sobreestimar sus métricas si existen cuadros cercanos "
+        "entre particiones."
     ),
     "La aplicación depende de Docker y GPU para la inferencia encapsulada;||La aplicación depende del entorno local de PyTorch": (
         "La aplicación depende del entorno local de PyTorch, Ultralytics y del "
@@ -234,9 +269,14 @@ PARAGRAPH_REPLACEMENTS = {
         "El repositorio mantiene configuración y código separados de datos y "
         "resultados. Los umbrales del analítico residen en analytic_config.yaml; "
         "los parámetros de percepción, en YAML; y las credenciales de MLflow, "
-        "en un archivo de entorno excluido de Git. El modelo principal PSINet y "
-        "el checkpoint alternativo best.pt se conservan en rutas explícitas, "
-        "mientras MLflow mantiene la trazabilidad del entrenamiento."
+        "en un archivo de entorno excluido de Git. El modelo principal PSINet "
+        "está versionado en Git y se identifica mediante su SHA256; el "
+        "checkpoint alternativo best.pt se conserva en una ruta separada. "
+        "MLflow mantiene la trazabilidad del entrenamiento del checkpoint "
+        "alternativo, no del entrenamiento original de PSINet. Una suite "
+        "automatizada inicial verifica la inferencia local sin Docker y los "
+        "resúmenes estadísticos; la cobertura de geometría, reglas y pipeline "
+        "completo todavía debe ampliarse."
     ),
     "La evaluación técnica obtiene 88,89 %": (
         "La evaluación técnica obtiene 88,89 % de exactitud global con el modelo "
@@ -245,21 +285,39 @@ PARAGRAPH_REPLACEMENTS = {
         "65 descartes en la muestra de 1.248 imágenes también muestran la "
         "utilidad de declarar no evaluables los casos sin evidencia suficiente."
     ),
-    "Versionar explícitamente el modelo de percepción": (
-        "Versionar explícitamente el modelo principal y el checkpoint "
-        "alternativo, y registrar junto a cada corrida la ruta del peso, la "
-        "clase seleccionada, el umbral de confianza y el conjunto de evaluación."
+    "Versionar explícitamente el modelo de percepción||Versionar explícitamente el modelo principal": (
+        "Definir un manifiesto común de percepción para Cono y Granulometría "
+        "que registre nombre canónico, SHA256, clases y procedencia del modelo; "
+        "cada corrida debe conservar además la ruta del peso, imgsz, class_id, "
+        "confianza, modo de combinación y conjunto de evaluación."
     ),
-    "ANEXO B. OBSERVACIONES EDITORIALES PARA LA INTEGRACIÓN": (
-        "ANEXO B. PENDIENTES EDITORIALES PARA LA INTEGRACIÓN"
+    "Se implementa una solución funcional": (
+        "Se implementa una solución funcional que transforma videos o imágenes "
+        "de camiones CAEX en máscaras de carga, variables geométricas, clases "
+        "visuales, overlays y veredictos por video. El sistema integra "
+        "extracción de fotogramas, una base de percepción YOLO compartida con "
+        "Granulometría, un adaptador de máscaras específico de Cono, analítica "
+        "y visualización sin entrenar un clasificador adicional para la "
+        "geometría."
+    ),
+    "ANEXO B. OBSERVACIONES EDITORIALES PARA LA INTEGRACIÓN||ANEXO B. PENDIENTES EDITORIALES PARA LA INTEGRACIÓN||ANEXO B. PUNTOS POR DEFINIR PARA LA FUSIÓN DEL INFORME": (
+        "ANEXO B. PUNTOS POR DEFINIR PARA LA FUSIÓN DEL INFORME"
     ),
 }
 
 
 APPENDIX_PENDING_ITEMS = (
     "Definir el título definitivo de la Memoria y reemplazar el título provisional de la portada.",
+    "Diseñar una introducción y un marco institucional únicos para Cono y Granulometría, evitando repetir los roles de la Universidad de Concepción, PSINet y Collahuasi.",
+    "Presentar una sola base común de percepción: nombre canónico del checkpoint PSINet, SHA256, clases caex/material, procedencia, limitaciones y contrato de máscara.",
+    "Definir si el modelo común residirá en una ubicación compartida o si cada módulo conservará una copia validada por hash; documentar la decisión de despliegue.",
+    "Separar los parámetros comunes del modelo de los postprocesamientos específicos: Cono usa imgsz=640, conf=0,35 y largest; Granulometría mantiene su propia configuración y estrategia de unión.",
+    "Distinguir explícitamente las dos pruebas técnicas de 90 imágenes, sus etiquetas, unidades de evaluación, métricas y ausencia de nombres de archivo compartidos.",
+    "Consolidar una sección única de datos que diferencie universo audiovisual, datasets de percepción, datasets analíticos, muestras descriptivas y dependencia temporal entre fotogramas.",
+    "Unificar la descripción de ejecución: inferencia local para ambos pipelines y Docker reservado al entrenamiento reproducible y servicios asociados.",
+    "Integrar conclusiones y limitaciones transversales sin mezclar asimetría visual interna con granulometría visual aparente ni atribuirles magnitudes físicas.",
     "Ajustar la numeración final de capítulos, tablas, figuras y anexos al fusionar esta parte con Granulometría; el prefijo C se mantiene provisionalmente.",
-    "Actualizar las fechas de consulta de las referencias y aplicar el estilo bibliográfico exigido por la carrera al cerrar el documento completo.",
+    "Actualizar las fechas de consulta, eliminar este anexo de trabajo y aplicar el estilo bibliográfico exigido por la carrera antes de entregar el documento completo.",
 )
 
 
@@ -283,16 +341,50 @@ def update_appendix(document: Document) -> None:
     heading_index = next(
         i
         for i, paragraph in enumerate(paragraphs)
-        if paragraph.text == "ANEXO B. PENDIENTES EDITORIALES PARA LA INTEGRACIÓN"
+        if paragraph.text == "ANEXO B. PUNTOS POR DEFINIR PARA LA FUSIÓN DEL INFORME"
     )
     item_paragraphs = paragraphs[heading_index + 2 :]
-    if len(item_paragraphs) < len(APPENDIX_PENDING_ITEMS):
-        raise RuntimeError("El Anexo B no contiene suficientes párrafos editables.")
+    if not item_paragraphs:
+        raise RuntimeError("El Anexo B no contiene párrafos editables.")
+
+    template = item_paragraphs[0]
+    while len(item_paragraphs) < len(APPENDIX_PENDING_ITEMS):
+        paragraph = document.add_paragraph(style=template.style)
+        paragraph.paragraph_format.left_indent = template.paragraph_format.left_indent
+        paragraph.paragraph_format.first_line_indent = (
+            template.paragraph_format.first_line_indent
+        )
+        paragraph.paragraph_format.space_before = template.paragraph_format.space_before
+        paragraph.paragraph_format.space_after = template.paragraph_format.space_after
+        paragraph.paragraph_format.line_spacing = template.paragraph_format.line_spacing
+        run = paragraph.add_run("")
+        if template.runs:
+            source_font = template.runs[0].font
+            run.font.name = source_font.name
+            run.font.size = source_font.size
+            run.font.bold = source_font.bold
+            run.font.italic = source_font.italic
+            run.font.color.rgb = source_font.color.rgb
+        item_paragraphs.append(paragraph)
 
     for paragraph, text in zip(item_paragraphs, APPENDIX_PENDING_ITEMS):
         replace_paragraph_text(paragraph, text)
     for paragraph in item_paragraphs[len(APPENDIX_PENDING_ITEMS) :]:
         remove_paragraph(paragraph)
+
+
+def remove_direct_page_break_before(document: Document, prefix: str) -> None:
+    paragraph = next(
+        paragraph
+        for paragraph in document.paragraphs
+        if paragraph.text.startswith(prefix)
+    )
+    properties = paragraph._p.pPr
+    if properties is None:
+        return
+    page_break = properties.find(qn("w:pageBreakBefore"))
+    if page_break is not None:
+        properties.remove(page_break)
 
 
 def update_text(document: Document) -> None:
@@ -329,6 +421,26 @@ def update_text(document: Document) -> None:
     training_table = document.tables[4]
     training_table.cell(1, 1).text = "yolov8n-seg (alternativo)"
     training_table.cell(1, 2).text = "Checkpoint reproducible conservado como respaldo."
+
+    variables_table = document.tables[5]
+    variables_table.cell(2, 1).text = (
+        "mask_area_px, unexpected_pixel_count, unexpected_color_count"
+    )
+    variables_table.cell(3, 1).text = (
+        "bbox_xmin, bbox_ymin, bbox_xmax, bbox_ymax, bbox_width, bbox_height, "
+        "bbox_aspect_ratio"
+    )
+    variables_table.cell(4, 1).text = (
+        "touches_left_border, touches_right_border, touches_top_border, "
+        "touches_bottom_border, is_truncated_by_frame"
+    )
+    variables_table.cell(9, 1).text = (
+        "predicted_class, is_valid, error_reason, warnings"
+    )
+    remove_direct_page_break_before(
+        document,
+        "Tabla C.8. Matriz de confusión de la prueba técnica.",
+    )
     update_appendix(document)
 
 
