@@ -654,7 +654,6 @@ with st.sidebar:
     )
     conf = st.slider("YOLO conf", min_value=0.05, max_value=0.95, value=0.35, step=0.05)
     device = st.text_input("device", value="0")
-    start_docker = st.checkbox("levantar Docker", value=False)
     video_min_valid_ratio = st.slider(
         "min valid ratio",
         min_value=0.0,
@@ -688,7 +687,6 @@ if run_clicked:
         max_frames_per_video=None if int(max_frames_raw) == 0 else int(max_frames_raw),
         conf=float(conf),
         device=device,
-        start_docker=bool(start_docker),
         video_min_valid_ratio=float(video_min_valid_ratio),
         video_majority_ratio=float(video_majority_ratio),
     )

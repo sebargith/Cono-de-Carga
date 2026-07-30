@@ -18,11 +18,13 @@ El caso sirve como referencia visual inicial. Las pruebas futuras deben ejecutar
 Para repetir la inferencia sobre las entradas versionadas:
 
 ```powershell
-docker compose exec cone-yolo python scripts/predict_yolo_seg.py `
-  --model models/alternative/best.pt `
-  --class-id 0 `
-  --source model_testing/reference/prueba_01/sources `
-  --project model_testing/outputs `
+cd D:\Memoria\Cono
+.\web_app\.venv\Scripts\Activate.ps1
+
+python perception\scripts\predict_yolo_seg.py `
+  --model perception\models\alternative\best.pt `
+  --source perception\model_testing\reference\prueba_01\sources `
+  --project perception\model_testing\outputs `
   --name prueba_01_repetida `
   --conf 0.35 `
   --device 0

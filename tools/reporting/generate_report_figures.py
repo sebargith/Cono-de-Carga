@@ -173,7 +173,7 @@ def figure_c2() -> None:
     )
     arrow(draw, (955, 700), (1105, 700), color=BLUE, width=5)
     draw.text((515, 825), "Procesos locales", font=font(23, True), fill=BLUE)
-    draw.text((790, 825), "Docker + GPU", font=font(23, True), fill=GREEN)
+    draw.text((790, 825), "Inferencia local + GPU", font=font(23, True), fill=GREEN)
     draw.text((1115, 825), "Archivos intercambiados", font=font(23, True), fill=ORANGE)
     save_jpeg(canvas, "Figura_C2_arquitectura.jpg")
 
@@ -385,13 +385,18 @@ def figure_c6() -> None:
     canvas = Image.new("RGB", (1800, 1050), WHITE)
     draw = ImageDraw.Draw(canvas)
     draw.text((60, 35), "Secuencia de ejecución del pipeline", font=font(47, True), fill=NAVY)
-    draw.text((60, 95), "Procesos locales, contenedor de percepción y archivos intercambiados", font=font(27), fill=GRAY)
+    draw.text(
+        (60, 95),
+        "Procesos locales y archivos intercambiados entre las etapas",
+        font=font(27),
+        fill=GRAY,
+    )
 
     lanes = [
         ("Usuario", 150, LIGHT_GRAY, NAVY),
         ("Web app", 450, LIGHT_BLUE, BLUE),
         ("Orquestador local", 780, "#eef2f5", NAVY),
-        ("Docker · YOLO", 1130, LIGHT_GREEN, GREEN),
+        ("Python · YOLO", 1130, LIGHT_GREEN, GREEN),
         ("Analítico", 1450, "#fff4e8", ORANGE),
         ("Resultados", 1680, "#f4f5f6", GRAY),
     ]
@@ -436,7 +441,7 @@ def figure_c7() -> None:
     draw.text((70, 165), "Consola", font=font(24, True), fill=WHITE)
     console_lines = [
         "[1/1] Extrayendo frames: 11 guardados",
-        "YOLO: 11 máscaras generadas con GPU",
+        "YOLO local: 11 máscaras generadas con GPU",
         "Analítico: 10/11 frames válidos",
         "Pipeline completado · resultados disponibles",
     ]

@@ -66,7 +66,7 @@ Hace estas tareas:
 2. crea carpetas de trabajo,
 3. extrae frames desde los videos,
 4. guarda manifiestos de videos y frames,
-5. llama al contenedor Docker de YOLO,
+5. ejecuta localmente la inferencia de YOLO,
 6. guarda mascaras generadas por YOLO,
 7. llama al analitico geometrico,
 8. genera `features.csv`,
@@ -223,10 +223,10 @@ El script que convierte predicciones YOLO a mascaras compatibles con el analitic
 perception/scripts/predict_to_analytic_masks.py
 ```
 
-Se ejecuta dentro del contenedor Docker del modulo de percepcion:
+Se ejecuta con el mismo interprete Python local que inicio el pipeline:
 
 ```powershell
-docker compose exec -T cone-yolo python scripts/predict_to_analytic_masks.py ...
+python perception/scripts/predict_to_analytic_masks.py ...
 ```
 
 El pipeline le pasa:
@@ -247,31 +247,16 @@ work/yolo_masks/Camera_8_20240907_160001__frame000000.png
 
 Ese contrato de nombres es lo que permite que el analitico encuentre la mascara correspondiente a cada imagen.
 
-## Por que Docker puede ver las carpetas de la web app
+## Entorno local compartido
 
-YOLO corre dentro de Docker, pero los videos, frames y resultados estan en Windows.
+La web app inicia el pipeline con el Python de `web_app/.venv`. El orquestador
+usa `sys.executable` para llamar a `predict_to_analytic_masks.py`, de modo que
+Streamlit, PyTorch, Ultralytics, OpenCV y el analitico comparten el mismo
+entorno. Las rutas se entregan directamente como rutas de Windows; no existen
+conversiones a rutas de contenedor ni montajes intermedios.
 
-Para que Docker pueda acceder a los frames generados por la web app, `perception/docker-compose.yml` monta:
-
-```text
-../web_app:/workspace/web_app
-```
-
-Entonces esta ruta de Windows:
-
-```text
-D:\Memoria\Cono\web_app\outputs\runs\<run_name>\work\frames
-```
-
-dentro del contenedor se ve como:
-
-```text
-/workspace/web_app/outputs/runs/<run_name>/work/frames
-```
-
-El script `scripts/run_pipeline_from_videos.py` hace esa conversion de rutas antes de llamar a Docker.
-
-Esto es clave: sin ese montaje, Docker no podria leer los frames ni escribir las mascaras dentro de la corrida de la web app.
+Docker queda fuera del flujo operacional. Su funcion es reproducir el entorno
+de preparacion, entrenamiento y validacion del modelo en `perception/`.
 
 ## Etapa 3: frames + mascaras a analitico
 
@@ -491,11 +476,11 @@ Si falla antes de YOLO, normalmente el problema esta en:
 
 Si falla en YOLO, normalmente el problema esta en:
 
-- Docker no levantado,
-- modelo `best.pt` inexistente,
+- dependencias locales de PyTorch o Ultralytics ausentes,
+- modelo de segmentacion inexistente,
 - GPU/device mal configurado,
-- montaje de rutas no disponible,
-- falta de script dentro del contenedor.
+- controlador NVIDIA incompatible,
+- rutas locales de frames o mascaras no disponibles.
 
 Si falla en el analitico, normalmente el problema esta en:
 

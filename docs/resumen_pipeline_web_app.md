@@ -214,7 +214,7 @@ Uso en el pipeline:
 - ejecutar scripts,
 - leer y escribir CSV/JSON,
 - controlar el flujo entre etapas,
-- llamar procesos externos como Docker.
+- ejecutar la inferencia local y el analitico en procesos coordinados.
 
 ### OpenCV
 
@@ -239,21 +239,23 @@ Uso en el pipeline:
 
 ### Docker
 
-Se usa para encapsular el entorno YOLO.
+Se usa para encapsular el entorno de preparacion y entrenamiento de YOLO.
 
-Uso en el pipeline:
+Uso en el proyecto:
 
-- ejecutar Ultralytics/YOLO con sus dependencias,
-- usar GPU si esta disponible,
-- evitar instalar PyTorch y CUDA directamente en la venv local de la web app.
+- preparar datasets de segmentacion;
+- entrenar y validar modelos con GPU;
+- registrar experimentos y artefactos en MLflow;
+- mantener reproducibles las versiones de CUDA, PyTorch y Ultralytics.
 
-El pipeline llama YOLO con:
+La inferencia operacional no usa Docker. El pipeline llama:
 
 ```text
-docker compose exec -T cone-yolo ...
+<python-local> perception/scripts/predict_to_analytic_masks.py ...
 ```
 
-Por eso, para el pipeline completo, Docker debe estar levantado.
+Ese Python corresponde al entorno `web_app/.venv`, que contiene Streamlit,
+PyTorch, Ultralytics y las dependencias del analitico.
 
 ### NumPy
 

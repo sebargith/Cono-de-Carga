@@ -12,8 +12,8 @@ La selección predeterminada está declarada en:
 - `perception/configs/perception_config.yaml`
 - `scripts/run_pipeline_from_videos.py`
 
-Ambos archivos `.pt` deben permanecer dentro de `perception/models/` para que
-sean visibles desde el contenedor Docker.
+Ambos archivos `.pt` permanecen dentro de `perception/models/` para mantener
+rutas estables en la inferencia local y en los experimentos Docker.
 
 Al usar el modelo principal no es necesario pasar `--class-id`: la
 configuración selecciona automáticamente la clase 1. Para ejecutar el modelo

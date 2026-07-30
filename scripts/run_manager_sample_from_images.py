@@ -82,7 +82,7 @@ def parse_args() -> argparse.Namespace:
         "--work-dir",
         default=None,
         help=(
-            "Carpeta temporal visible para Docker. Por defecto queda en "
+            "Carpeta temporal de la corrida. Por defecto queda en "
             "perception/model_testing/presentation_sample_runs/<run-name>."
         ),
     )
@@ -97,7 +97,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--perception-dir",
         default="perception",
-        help="Directorio del modulo de percepcion con docker-compose.yml.",
+        help="Directorio del modulo de percepcion y sus scripts.",
     )
     parser.add_argument(
         "--yolo-model",
@@ -125,16 +125,6 @@ def parse_args() -> argparse.Namespace:
         choices=("largest", "merge_all"),
         default="largest",
         help="Como combinar instancias YOLO antes de pasar al analitico.",
-    )
-    parser.add_argument(
-        "--docker-service",
-        default="cone-yolo",
-        help="Servicio Docker Compose usado para correr YOLO.",
-    )
-    parser.add_argument(
-        "--start-docker",
-        action="store_true",
-        help="Ejecuta docker compose up -d antes de correr YOLO.",
     )
     parser.add_argument(
         "--overwrite",
@@ -572,8 +562,6 @@ def main() -> int:
 
     run_yolo_masks(
         perception_dir=perception_dir,
-        web_app_dir=None,
-        docker_service=args.docker_service,
         yolo_model=yolo_model,
         frames_dir=staged_images_dir,
         masks_dir=masks_dir,
@@ -581,7 +569,6 @@ def main() -> int:
         imgsz=args.imgsz,
         device=str(args.device),
         mask_mode=args.mask_mode,
-        start_docker=bool(args.start_docker),
         class_id=args.class_id,
     )
     run_analytic(

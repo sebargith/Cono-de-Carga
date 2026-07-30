@@ -19,9 +19,12 @@ background:0,0,0::
 
 El pipeline convierte esas mascaras RGB a formato YOLO-seg y entrena un modelo desde una arquitectura `.yaml`, no desde un `best.pt` ya entrenado.
 
-## 1. Docker Con GPU
+## 1. Docker Con GPU Para Entrenamiento
 
-Esta es la forma recomendada. Docker encapsula Python, PyTorch, CUDA runtime, Ultralytics y dependencias. No uses `.venv-yolo` si vas a entrenar con Docker.
+Docker encapsula Python, PyTorch, CUDA runtime, Ultralytics y MLflow para
+preparar datos, entrenar y validar modelos. La inferencia del pipeline se
+ejecuta localmente y no requiere levantar este contenedor. No uses
+`.venv-yolo` si vas a entrenar con Docker.
 
 Requisitos:
 
@@ -385,13 +388,18 @@ docker compose exec cone-yolo python scripts/validate_yolo_seg.py `
   --device 0
 ```
 
-## 8. Inferencia
+## 8. Inferencia Local
+
+Activa el entorno operacional desde la raíz del proyecto:
 
 ```powershell
-docker compose exec cone-yolo python scripts/predict_yolo_seg.py `
-  --model "models/primary/psinet_carga_visible.pt" `
-  --source "model_testing/reference/prueba_01/sources" `
-  --config "configs/perception_config.yaml" `
+cd D:\Memoria\Cono
+.\web_app\.venv\Scripts\Activate.ps1
+
+python perception\scripts\predict_yolo_seg.py `
+  --model "perception\models\primary\psinet_carga_visible.pt" `
+  --source "perception\model_testing\reference\prueba_01\sources" `
+  --config "perception\configs\perception_config.yaml" `
   --conf 0.35 `
   --device 0
 ```
@@ -407,10 +415,13 @@ D:\Memoria\Cono\perception\model_testing\outputs\
 Para conectar YOLO-seg con el analitico geometrico, usa el adaptador:
 
 ```powershell
-docker compose exec cone-yolo python scripts/predict_to_analytic_masks.py `
-  --model "models/primary/psinet_carga_visible.pt" `
-  --images-dir "model_testing/reference/prueba_01/sources" `
-  --masks-dir "model_testing/analytic_masks/prueba_01" `
+cd D:\Memoria\Cono
+.\web_app\.venv\Scripts\Activate.ps1
+
+python perception\scripts\predict_to_analytic_masks.py `
+  --model "perception\models\primary\psinet_carga_visible.pt" `
+  --images-dir "perception\model_testing\reference\prueba_01\sources" `
+  --masks-dir "perception\model_testing\analytic_masks\prueba_01" `
   --conf 0.35 `
   --device 0 `
   --overwrite
@@ -440,11 +451,11 @@ No guardes estas mascaras como JPG/JPEG, porque la compresion puede alterar el c
 Por defecto, si YOLO detecta mas de una instancia de carga en el frame, se conserva la de mayor area (`analytic_mask_mode: largest`). Esto evita que detecciones secundarias afecten la forma visible de la carga. Si necesitas unir todas las instancias detectadas, usa:
 
 ```powershell
-docker compose exec cone-yolo python scripts/predict_to_analytic_masks.py `
-  --model "models/alternative/best.pt" `
+python perception\scripts\predict_to_analytic_masks.py `
+  --model "perception\models\alternative\best.pt" `
   --class-id 0 `
   --images-dir "<carpeta_de_frames>" `
-  --masks-dir "model_testing/analytic_masks/<nombre_prueba>" `
+  --masks-dir "perception\model_testing\analytic_masks\<nombre_prueba>" `
   --mask-mode merge_all `
   --overwrite
 ```
@@ -513,3 +524,7 @@ Parametros importantes:
 ## 11. Conexion Con El Analitico Geometrico
 
 El modelo de percepcion produce mascaras automaticas de la carga visible mediante `scripts/predict_to_analytic_masks.py`. Esas mascaras pueden reemplazar las mascaras manuales de CVAT y alimentar el analitico geometrico en `src/cone_load`.
+
+La inferencia utiliza el entorno local definido en `requirements/runtime.txt`.
+Docker queda reservado para preparación de datos, entrenamiento, validación y
+registro experimental.

@@ -29,13 +29,17 @@ con clase `Carga` (`class_id=0`).
 
 ## Ejecución desde video
 
-La inferencia de percepción se ejecuta dentro del contenedor Docker:
+La inferencia se ejecuta localmente con el mismo entorno Python del pipeline.
+El lanzador de la web app crea este entorno e instala las dependencias cuando
+faltan. Para prepararlo manualmente:
 
 ```powershell
-cd D:\Memoria\Cono\perception
-docker compose up -d
-
 cd D:\Memoria\Cono
+py -3.12 -m venv web_app\.venv
+.\web_app\.venv\Scripts\Activate.ps1
+python -m pip install --upgrade pip
+pip install -r requirements\runtime.txt
+
 python scripts\run_pipeline_from_videos.py `
   --videos-dir "data\pipeline_input\videos" `
   --run-name "prueba_video" `
@@ -51,8 +55,17 @@ está en [docs/pipeline_videos_locales.md](docs/pipeline_videos_locales.md).
 
 En Windows se puede iniciar con doble clic en
 `Abrir web app Cono de Carga.bat`. El lanzador crea el entorno local de la
-interfaz cuando no existe. Docker debe estar disponible para la etapa de
-segmentación.
+interfaz e instala Streamlit, PyTorch y Ultralytics cuando faltan. La primera
+instalación puede tardar varios minutos; los inicios siguientes reutilizan el
+mismo entorno. No es necesario levantar Docker para ejecutar la web app o el
+pipeline.
+
+## Uso de Docker
+
+Docker se conserva en `perception/` para preparar datasets, entrenar y validar
+modelos con un entorno reproducible de CUDA, PyTorch, Ultralytics y MLflow. Los
+pesos producidos se copian a `perception/models/` y la inferencia operacional
+los carga localmente.
 
 ## Analítico con máscaras existentes
 
@@ -74,7 +87,8 @@ configs/       configuración del analítico
 data/          datos locales y benchmarks no versionados
 deliverables/  informe, presentación y evaluaciones consolidadas
 docs/          arquitectura, uso y contexto técnico
-perception/    preparación, entrenamiento e inferencia YOLO con Docker
+perception/    modelos, inferencia local y entrenamiento YOLO con Docker
+requirements/  dependencias del pipeline local
 scripts/       orquestadores y evaluaciones
 src/           analítico geométrico
 tools/         utilidades auxiliares y generación de figuras

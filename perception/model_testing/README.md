@@ -14,12 +14,13 @@ model_testing/
 Ejemplo desde PowerShell:
 
 ```powershell
-cd D:\Memoria\Cono\perception
+cd D:\Memoria\Cono
+.\web_app\.venv\Scripts\Activate.ps1
 
-docker compose exec cone-yolo python scripts/predict_yolo_seg.py `
-  --model model_testing/models/best.pt `
-  --source model_testing/sources `
-  --project model_testing/outputs `
+python perception\scripts\predict_yolo_seg.py `
+  --model perception\model_testing\models\best.pt `
+  --source perception\model_testing\sources `
+  --project perception\model_testing\outputs `
   --name prueba_01 `
   --conf 0.35 `
   --device 0 `

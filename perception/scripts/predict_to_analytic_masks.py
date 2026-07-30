@@ -331,7 +331,10 @@ def main() -> int:
     try:
         from ultralytics import YOLO
     except ImportError as exc:
-        raise ImportError("No esta instalado ultralytics.") from exc
+        raise ImportError(
+            "No esta instalado ultralytics en el entorno local. "
+            "Instala requirements/runtime.txt con el mismo Python que ejecuta el pipeline."
+        ) from exc
 
     model = YOLO(str(model_path))
     manifest_rows: list[dict[str, Any]] = []

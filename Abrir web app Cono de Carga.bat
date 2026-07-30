@@ -38,17 +38,18 @@ if not exist "web_app\.venv\Scripts\python.exe" (
 
 set "PYTHON=web_app\.venv\Scripts\python.exe"
 
-echo Verificando dependencias de la web app...
-"%PYTHON%" -c "import streamlit" >nul 2>nul
+echo Verificando dependencias locales de la web app y percepcion...
+"%PYTHON%" -c "import streamlit, ultralytics, torch" >nul 2>nul
 if errorlevel 1 (
-  echo Instalando dependencias en web_app\.venv...
+  echo Instalando dependencias locales en web_app\.venv...
+  echo La primera instalacion incluye PyTorch y Ultralytics y puede tardar varios minutos.
   "%PYTHON%" -m pip install --upgrade pip
   if errorlevel 1 (
     echo ERROR: fallo la actualizacion de pip.
     pause
     exit /b 1
   )
-  "%PYTHON%" -m pip install -r "web_app\requirements.txt"
+  "%PYTHON%" -m pip install -r "requirements\runtime.txt"
   if errorlevel 1 (
     echo ERROR: fallo la instalacion de dependencias.
     pause
@@ -56,20 +57,8 @@ if errorlevel 1 (
   )
 )
 
-where docker >nul 2>nul
-if errorlevel 1 (
-  echo Advertencia: Docker no esta disponible en PATH.
-  echo La web app abrira, pero el pipeline con YOLO necesitara Docker levantado.
-) else (
-  echo Levantando contenedor YOLO si no esta activo...
-  pushd "perception"
-  docker compose up -d
-  if errorlevel 1 (
-    echo Advertencia: no se pudo levantar Docker automaticamente.
-    echo Puedes abrir la web app igual, pero revisa Docker antes de ejecutar el pipeline.
-  )
-  popd
-)
+echo Verificando aceleracion GPU local...
+"%PYTHON%" -c "import torch; print('CUDA disponible:', torch.cuda.is_available()); print('Dispositivo:', torch.cuda.get_device_name(0) if torch.cuda.is_available() else 'CPU')"
 
 echo.
 echo Abriendo web app en el navegador...

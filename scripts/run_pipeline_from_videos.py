@@ -115,7 +115,7 @@ def parse_args() -> argparse.Namespace:
         "--work-dir",
         default=None,
         help=(
-            "Carpeta de trabajo visible para Docker. Por defecto queda dentro "
+            "Carpeta de trabajo del pipeline. Por defecto queda dentro "
             "de perception/model_testing/pipeline_runs/. La web app puede usar "
             "web_app/outputs/runs/."
         ),
@@ -131,7 +131,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--perception-dir",
         default="perception",
-        help="Directorio del modulo de percepcion con docker-compose.yml.",
+        help="Directorio del modulo de percepcion y sus scripts.",
     )
     parser.add_argument(
         "--yolo-model",
@@ -167,16 +167,6 @@ def parse_args() -> argparse.Namespace:
         choices=("largest", "merge_all"),
         default="largest",
         help="Como combinar instancias YOLO antes de pasar al analitico.",
-    )
-    parser.add_argument(
-        "--docker-service",
-        default="cone-yolo",
-        help="Servicio Docker Compose usado para correr YOLO.",
-    )
-    parser.add_argument(
-        "--start-docker",
-        action="store_true",
-        help="Ejecuta docker compose up -d antes de correr YOLO.",
     )
     parser.add_argument(
         "--overwrite",
@@ -445,22 +435,6 @@ def perception_host_path(value: str | Path, perception_dir: Path) -> Path:
     )
 
 
-def to_container_path(host_path: Path, perception_dir: Path, web_app_dir: Path | None = None) -> str:
-    resolved = host_path.resolve()
-    perception_root = perception_dir.resolve()
-    mount_points: list[tuple[Path, str]] = [(perception_root, "/workspace")]
-    if web_app_dir is not None:
-        mount_points.append((web_app_dir.resolve(), "/workspace/web_app"))
-
-    for host_root, container_root in mount_points:
-        if is_relative_to(resolved, host_root):
-            rel = resolved.relative_to(host_root)
-            suffix = rel.as_posix()
-            return container_root if not suffix else f"{container_root}/{suffix}"
-
-    raise ValueError(f"La ruta no esta montada en Docker: {resolved}")
-
-
 def run_command(command: list[str], cwd: Path, label: str) -> None:
     print(f"\n== {label} ==")
     print(" ".join(command))
@@ -471,8 +445,6 @@ def run_command(command: list[str], cwd: Path, label: str) -> None:
 
 def run_yolo_masks(
     perception_dir: Path,
-    web_app_dir: Path | None,
-    docker_service: str,
     yolo_model: Path,
     frames_dir: Path,
     masks_dir: Path,
@@ -480,26 +452,21 @@ def run_yolo_masks(
     imgsz: int | None,
     device: str,
     mask_mode: str,
-    start_docker: bool,
     class_id: int | None = None,
 ) -> None:
-    if start_docker:
-        run_command(["docker", "compose", "up", "-d"], perception_dir, "levantar Docker")
-
+    prediction_script = require_file(
+        perception_dir / "scripts" / "predict_to_analytic_masks.py",
+        "script de inferencia",
+    )
     command = [
-        "docker",
-        "compose",
-        "exec",
-        "-T",
-        docker_service,
-        "python",
-        "scripts/predict_to_analytic_masks.py",
+        sys.executable,
+        str(prediction_script),
         "--model",
-        to_container_path(yolo_model, perception_dir, web_app_dir),
+        str(yolo_model),
         "--images-dir",
-        to_container_path(frames_dir, perception_dir, web_app_dir),
+        str(frames_dir),
         "--masks-dir",
-        to_container_path(masks_dir, perception_dir, web_app_dir),
+        str(masks_dir),
         "--conf",
         str(conf),
         "--device",
@@ -513,7 +480,7 @@ def run_yolo_masks(
     if class_id is not None:
         command.extend(["--class-id", str(class_id)])
 
-    run_command(command, perception_dir, "YOLO a mascaras analiticas")
+    run_command(command, ROOT, "inferencia YOLO local a mascaras analiticas")
 
 
 def run_analytic(frames_dir: Path, masks_dir: Path, analytic_dir: Path, config_path: Path) -> None:
@@ -888,8 +855,7 @@ def main() -> int:
 
     work_base = perception_dir / "model_testing" / "pipeline_runs"
     output_base = ROOT / "outputs" / "pipeline_runs"
-    web_app_base = ROOT / "web_app"
-    web_app_runs_base = web_app_base / "outputs" / "runs"
+    web_app_runs_base = ROOT / "web_app" / "outputs" / "runs"
     work_dir = resolve_repo_path(args.work_dir) if args.work_dir else work_base / run_name
     output_dir = resolve_repo_path(args.output_dir) if args.output_dir else output_base / run_name
 
@@ -955,8 +921,6 @@ def main() -> int:
 
     run_yolo_masks(
         perception_dir=perception_dir,
-        web_app_dir=web_app_base,
-        docker_service=args.docker_service,
         yolo_model=yolo_model,
         frames_dir=frames_dir,
         masks_dir=masks_dir,
@@ -964,7 +928,6 @@ def main() -> int:
         imgsz=args.imgsz,
         device=args.device,
         mask_mode=args.mask_mode,
-        start_docker=args.start_docker,
         class_id=args.class_id,
     )
 
@@ -1026,6 +989,7 @@ def main() -> int:
         "video_count": len(videos),
         "frame_count": len(frame_rows),
         "yolo_model": str(yolo_model),
+        "inference_backend": "local",
         "conf": args.conf,
         "device": args.device,
         "mask_mode": args.mask_mode,

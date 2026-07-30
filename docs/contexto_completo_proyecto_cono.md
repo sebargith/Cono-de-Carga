@@ -575,7 +575,7 @@ Cada overlay muestra:
 
 ## 8. Módulo de percepción YOLO
 
-### 8.1 Encapsulamiento
+### 8.1 Entornos de ejecución
 
 El módulo se encuentra en:
 
@@ -583,7 +583,8 @@ El módulo se encuentra en:
 D:\Memoria\Cono\perception
 ```
 
-El camino recomendado usa Docker con GPU NVIDIA. La imagen se basa en:
+Docker con GPU NVIDIA se utiliza para preparación de datos, entrenamiento,
+validación y registro en MLflow. La imagen se basa en:
 
 ```text
 nvidia/cuda:12.4.1-cudnn-runtime-ubuntu22.04
@@ -600,7 +601,17 @@ PyYAML
 
 El cambio de ubicación del almacenamiento interno de imágenes Docker desde C: a D: no modifica comandos del proyecto; Docker Desktop administra esa ubicación.
 
-### 8.2 Docker Compose
+La inferencia operacional se ejecuta fuera de Docker con el entorno local:
+
+```text
+web_app\.venv
+```
+
+Sus dependencias se declaran en `requirements/runtime.txt`. El mismo Python
+ejecuta Streamlit, `predict_to_analytic_masks.py`, el analítico y la agregación
+por video.
+
+### 8.2 Docker Compose para entrenamiento
 
 Servicio principal:
 
@@ -731,7 +742,7 @@ Para segmentar carga se selecciona:
 Este valor se encuentra en `prediction.class_id` dentro de
 `perception/configs/perception_config.yaml`.
 
-El archivo Psinet está presente localmente, pero no aparece versionado en la rama `feat-prueba-tecnica` del repositorio remoto.
+El archivo PSINet está versionado como modelo principal en la rama `main`.
 
 ### 8.6 Adaptador YOLO -> analítico
 
@@ -774,7 +785,7 @@ Etapas:
 1. Busca videos locales `.mp4`, `.avi`, `.mov`, `.mkv`, `.m4v`.
 2. Extrae frames con OpenCV.
 3. Guarda manifiestos de videos y frames.
-4. Ejecuta YOLO dentro de Docker.
+4. Ejecuta YOLO con el entorno Python local.
 5. Convierte predicciones a máscaras RGB.
 6. Ejecuta el analítico con Python local.
 7. Genera features y overlays.
@@ -793,7 +804,6 @@ Parámetros relevantes:
 --imgsz
 --device 0
 --mask-mode largest
---start-docker
 --video-min-valid-ratio 0.5
 --video-majority-ratio 0.6
 ```
@@ -882,7 +892,7 @@ Streamlit
 Pandas
 OpenCV
 Python local
-Docker para YOLO
+PyTorch y Ultralytics locales
 ```
 
 Archivos principales:
@@ -902,7 +912,6 @@ Funciones:
 - límite de frames;
 - confianza YOLO;
 - dispositivo;
-- opción de levantar Docker;
 - consola en vivo y scrolleable;
 - selección de video dentro de una corrida;
 - overlays;
@@ -930,8 +939,9 @@ Abrir web app Cono de Carga.bat
 El lanzador:
 
 - crea `web_app\.venv` si falta;
-- instala dependencias si falta Streamlit;
-- intenta levantar Docker;
+- instala Streamlit, PyTorch, Ultralytics y las dependencias del analítico si
+  faltan;
+- comprueba si CUDA está disponible en el entorno local;
 - abre Streamlit en `http://127.0.0.1:8502`;
 - utiliza un puerto separado para no interferir con la aplicacion de
   Granulometria, que puede estar ejecutandose en `8501`.
@@ -1229,7 +1239,8 @@ El proyecto contempla:
 - máscara truncada por borde;
 - stems duplicados;
 - salidas existentes sin `--overwrite`;
-- modelos fuera de rutas montadas por Docker;
+- modelos o rutas locales inexistentes;
+- ausencia de PyTorch o Ultralytics en el entorno local;
 - ausencia de predicciones YOLO;
 - múltiples instancias.
 
@@ -1247,7 +1258,9 @@ La web app usa su propio entorno:
 web_app\.venv
 ```
 
-Docker solo es obligatorio para la etapa YOLO. Extracción de frames, analítico, evaluación y web frontend se ejecutan en Python local.
+El pipeline operacional completo se ejecuta en Python local. Docker es
+obligatorio únicamente para reproducir la preparación, el entrenamiento y la
+validación encapsulada del modelo.
 
 ## 15. Comandos de referencia
 
@@ -1285,10 +1298,13 @@ docker compose exec cone-yolo python scripts/train_yolo_seg.py `
 ### 15.4 Ejecutar directamente el modelo principal
 
 ```powershell
-docker compose exec -T cone-yolo python scripts/predict_to_analytic_masks.py `
-  --model "/workspace/models/primary/psinet_carga_visible.pt" `
-  --images-dir "/workspace/<imagenes>" `
-  --masks-dir "/workspace/<salida_mascaras>" `
+cd D:\Memoria\Cono
+.\web_app\.venv\Scripts\Activate.ps1
+
+python perception\scripts\predict_to_analytic_masks.py `
+  --model "perception\models\primary\psinet_carga_visible.pt" `
+  --images-dir "<imagenes>" `
+  --masks-dir "<salida_mascaras>" `
   --class-id 1 `
   --conf 0.35 `
   --device 0 `
@@ -1300,17 +1316,18 @@ docker compose exec -T cone-yolo python scripts/predict_to_analytic_masks.py `
 
 ```powershell
 cd D:\Memoria\Cono
+.\web_app\.venv\Scripts\Activate.ps1
 python scripts\run_pipeline_from_videos.py `
   --videos-dir "data\pipeline_input\videos" `
   --run-name "prueba_videos_01" `
   --interval-seconds 2 `
   --conf 0.35 `
   --device 0 `
-  --start-docker `
   --overwrite
 ```
 
-Este comando todavía usa el modelo YOLO original por defecto.
+Este comando usa el modelo principal PSINet por defecto y realiza la inferencia
+localmente.
 
 ### 15.6 Web app
 
@@ -1431,7 +1448,8 @@ Prioridad 3:
 | `perception/scripts/prepare_yolo_dataset.py` | CVAT -> YOLO-seg. |
 | `perception/scripts/train_yolo_seg.py` | Entrenamiento GPU y MLflow. |
 | `perception/scripts/predict_to_analytic_masks.py` | YOLO -> máscara RGB analítica. |
-| `perception/docker-compose.yml` | Contenedor GPU y montajes. |
+| `perception/docker-compose.yml` | Entorno GPU para entrenamiento y validación. |
+| `requirements/runtime.txt` | Dependencias de inferencia, analítico y web app. |
 | `web_app/app.py` | Interfaz Streamlit. |
 | `web_app/src/pipeline_runner.py` | Ejecución y streaming de consola. |
 | `tools/frame_hunter_nextcloud/main.py` | Descarga y extracción desde Nextcloud. |

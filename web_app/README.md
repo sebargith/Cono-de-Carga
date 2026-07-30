@@ -16,25 +16,13 @@ web_app/
 
 ## Requisitos
 
-El contenedor YOLO debe existir. Si no esta levantado:
+- Python 3.12.
+- Controlador NVIDIA compatible para usar `device=0`.
+- Dependencias de `requirements/runtime.txt`.
 
-```powershell
-cd D:\Memoria\Cono\perception
-docker compose up -d
-```
-
-Si el contenedor ya estaba creado antes de agregar la web app, recrealo una vez para que tome el montaje nuevo:
-
-```powershell
-cd D:\Memoria\Cono\perception
-docker compose up -d --force-recreate
-```
-
-El `docker-compose.yml` monta `web_app/` dentro del contenedor en:
-
-```text
-/workspace/web_app
-```
+Docker no es necesario para abrir la app ni para ejecutar la inferencia. Se
+mantiene únicamente en `perception/` para entrenamiento y validación de
+modelos.
 
 ## Instalacion
 
@@ -45,7 +33,14 @@ cd D:\Memoria\Cono
 py -3.12 -m venv web_app\.venv
 .\web_app\.venv\Scripts\Activate.ps1
 python -m pip install --upgrade pip
-pip install -r web_app\requirements.txt
+pip install -r requirements\runtime.txt
+```
+
+La instalación incorpora Streamlit, PyTorch y Ultralytics. Puede tardar varios
+minutos la primera vez. Para comprobar que la GPU quedó disponible:
+
+```powershell
+python -c "import torch; print(torch.cuda.is_available()); print(torch.cuda.get_device_name(0) if torch.cuda.is_available() else 'CPU')"
 ```
 
 ## Ejecutar
@@ -55,6 +50,10 @@ cd D:\Memoria\Cono
 .\web_app\.venv\Scripts\Activate.ps1
 streamlit run web_app\app.py --server.address 127.0.0.1 --server.port 8502
 ```
+
+También se puede usar `Abrir web app Cono de Carga.bat`. El lanzador crea
+`web_app\.venv` cuando falta, instala las dependencias una sola vez y luego
+inicia Streamlit.
 
 La aplicacion de Cono usa de forma dedicada:
 

@@ -12,18 +12,14 @@ videos locales
 
 ## Requisitos
 
-El contenedor de percepcion debe estar construido y levantado:
+La inferencia usa el entorno Python local del proyecto. Si todavía no existe:
 
 ```powershell
-cd D:\Memoria\Cono\perception
-docker compose up -d
-```
-
-Si todavia no existe la imagen:
-
-```powershell
-docker compose build
-docker compose up -d
+cd D:\Memoria\Cono
+py -3.12 -m venv web_app\.venv
+.\web_app\.venv\Scripts\Activate.ps1
+python -m pip install --upgrade pip
+pip install -r requirements\runtime.txt
 ```
 
 ## Carpeta De Entrada
@@ -46,6 +42,7 @@ Desde la raiz del proyecto:
 
 ```powershell
 cd D:\Memoria\Cono
+.\web_app\.venv\Scripts\Activate.ps1
 
 python scripts/run_pipeline_from_videos.py `
   --videos-dir "data\pipeline_input\videos" `
@@ -57,19 +54,9 @@ python scripts/run_pipeline_from_videos.py `
   --overwrite
 ```
 
-Si quieres que el script levante Docker antes de inferir:
-
-```powershell
-python scripts/run_pipeline_from_videos.py `
-  --videos-dir "data\pipeline_input\videos" `
-  --run-name "prueba_videos_01" `
-  --start-docker `
-  --overwrite
-```
-
 ## Salidas
 
-Frames y mascaras, en una carpeta visible para Docker:
+Frames y máscaras de trabajo:
 
 ```text
 D:\Memoria\Cono\perception\model_testing\pipeline_runs\prueba_videos_01\
@@ -187,4 +174,7 @@ Regla inicial:
 
 ## Nota
 
-El script usa Docker solo para la etapa YOLO. La extraccion de frames y el analitico corren con el Python local del proyecto.
+Todo el pipeline operacional corre con el mismo Python local: extracción de
+frames, inferencia YOLO, generación de máscaras, analítico y agregación por
+video. Docker se utiliza por separado para preparar datos, entrenar y validar
+modelos.

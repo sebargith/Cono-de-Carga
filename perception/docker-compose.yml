@@ -28,7 +28,6 @@ services:
       - ./model_testing:/workspace/model_testing
       - ./mlruns:/workspace/mlruns
       - ./.cache:/workspace/.cache
-      - ../web_app:/workspace/web_app
 
   mlflow-ui:
     image: cono-yolo-perception:latest

@@ -6,6 +6,7 @@ import zipfile
 from pathlib import Path
 
 from docx import Document
+from docx.shared import Inches
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -22,6 +23,30 @@ TRAINING_FIGURE = (
     / "figuras"
     / "Figura_C4_entrenamiento_mlflow.png"
 )
+REPORT_FIGURES = {
+    "image2.jpg": (
+        ROOT
+        / "deliverables"
+        / "informe_final"
+        / "figuras"
+        / "Figura_C2_arquitectura.jpg"
+    ),
+    "image4.png": TRAINING_FIGURE,
+    "image6.jpg": (
+        ROOT
+        / "deliverables"
+        / "informe_final"
+        / "figuras"
+        / "Figura_C6_secuencia_pipeline.jpg"
+    ),
+    "image7.jpg": (
+        ROOT
+        / "deliverables"
+        / "informe_final"
+        / "figuras"
+        / "Figura_C7_web_app.jpg"
+    ),
+}
 
 
 PARAGRAPH_REPLACEMENTS = {
@@ -46,7 +71,9 @@ PARAGRAPH_REPLACEMENTS = {
     ),
     "La implementación integra Python, OpenCV": (
         "La implementación integra Python, OpenCV, NumPy, SciPy, Pandas, "
-        "Ultralytics, Docker, NVIDIA CUDA, MLflow y Streamlit. El repositorio "
+        "Ultralytics, NVIDIA CUDA, MLflow y Streamlit. Docker encapsula el "
+        "entrenamiento, mientras la inferencia y el pipeline se ejecutan en un "
+        "entorno Python local. El repositorio "
         "de percepción registra un entrenamiento reproducible con 240 imágenes "
         "y conserva su best.pt como checkpoint alternativo. Para la operación "
         "se seleccionó el modelo principal PSINet. En una prueba técnica "
@@ -63,7 +90,9 @@ PARAGRAPH_REPLACEMENTS = {
     ),
     "The implementation combines Python, OpenCV": (
         "The implementation combines Python, OpenCV, NumPy, SciPy, Pandas, "
-        "Ultralytics, Docker, NVIDIA CUDA, MLflow, and Streamlit. The repository "
+        "Ultralytics, NVIDIA CUDA, MLflow, and Streamlit. Docker encapsulates "
+        "training, while inference and the operational pipeline run in a local "
+        "Python environment. The repository "
         "records a reproducible training run with 240 images and retains its "
         "best.pt as an alternative checkpoint, while PSINet is used as the "
         "primary operational segmenter. In a balanced technical evaluation with "
@@ -117,6 +146,14 @@ PARAGRAPH_REPLACEMENTS = {
         "condiciones. El analítico interpreta la máscara entregada por el modelo "
         "principal de percepción y no intenta reconstruir regiones omitidas ni "
         "corregir contornos erróneos."
+    ),
+    "La inferencia de YOLO utiliza el modelo entrenado solo cuando el contenedor Docker está disponible||La inferencia operacional de YOLO se ejecuta": (
+        "La inferencia operacional de YOLO se ejecuta con PyTorch y Ultralytics "
+        "en el entorno Python local del proyecto. El orquestador invoca el "
+        "adaptador de máscaras mediante el mismo intérprete que usa la "
+        "aplicación web, por lo que no requiere Docker ni conversiones de rutas "
+        "durante el análisis. Docker se reserva para el entrenamiento y la "
+        "validación reproducibles con GPU."
     ),
     "La evaluación se organiza en tres niveles.||La evaluación considera tres niveles:": (
         "La evaluación considera tres niveles: métricas internas del "
@@ -186,6 +223,12 @@ PARAGRAPH_REPLACEMENTS = {
         "balanceada no reemplazan una evaluación prospectiva por secuencias "
         "completas, eventos independientes y condiciones operacionales más "
         "diversas."
+    ),
+    "La aplicación depende de Docker y GPU para la inferencia encapsulada;||La aplicación depende del entorno local de PyTorch": (
+        "La aplicación depende del entorno local de PyTorch, Ultralytics y del "
+        "controlador NVIDIA para acelerar la inferencia. Docker no es un "
+        "requisito operacional, pero no se evalúan todavía la latencia "
+        "sostenida ni la disponibilidad del sistema en producción."
     ),
     "El repositorio mantiene configuración y código": (
         "El repositorio mantiene configuración y código separados de datos y "
@@ -272,13 +315,27 @@ def update_text(document: Document) -> None:
     alternatives_table = document.tables[0]
     alternatives_table.cell(4, 3).text = "Solución implementada."
 
+    requirements_table = document.tables[1]
+    requirements_table.cell(8, 2).text = (
+        "El entorno de entrenamiento se construye con Docker y dependencias fijadas."
+    )
+
+    components_table = document.tables[2]
+    components_table.cell(7, 1).text = "Python local"
+    components_table.cell(7, 2).text = (
+        "Orquestar las etapas y construir el resumen por video."
+    )
+
     training_table = document.tables[4]
     training_table.cell(1, 1).text = "yolov8n-seg (alternativo)"
     training_table.cell(1, 2).text = "Checkpoint reproducible conservado como respaldo."
     update_appendix(document)
 
 
-def replace_embedded_figure(docx_path: Path, figure_path: Path) -> None:
+def replace_embedded_figures(
+    docx_path: Path,
+    figures: dict[str, Path],
+) -> None:
     with tempfile.TemporaryDirectory(prefix="cone_report_") as temp_dir:
         temp = Path(temp_dir)
         unpacked = temp / "unpacked"
@@ -286,10 +343,13 @@ def replace_embedded_figure(docx_path: Path, figure_path: Path) -> None:
         with zipfile.ZipFile(docx_path) as archive:
             archive.extractall(unpacked)
 
-        embedded = unpacked / "word" / "media" / "image4.png"
-        if not embedded.exists():
-            raise FileNotFoundError(f"No se encontró la figura C4 embebida: {embedded}")
-        shutil.copy2(figure_path, embedded)
+        for embedded_name, figure_path in figures.items():
+            embedded = unpacked / "word" / "media" / embedded_name
+            if not embedded.exists():
+                raise FileNotFoundError(f"No se encontró la figura embebida: {embedded}")
+            if not figure_path.exists():
+                raise FileNotFoundError(f"No se encontró la figura fuente: {figure_path}")
+            shutil.copy2(figure_path, embedded)
 
         rebuilt = temp / docx_path.name
         with zipfile.ZipFile(rebuilt, "w", compression=zipfile.ZIP_DEFLATED) as archive:
@@ -299,16 +359,29 @@ def replace_embedded_figure(docx_path: Path, figure_path: Path) -> None:
         shutil.copy2(rebuilt, docx_path)
 
 
+def resize_architecture_figure(document: Document) -> None:
+    for shape in document.inline_shapes:
+        relationship_id = shape._inline.graphic.graphicData.pic.blipFill.blip.embed
+        target = document.part.rels[relationship_id].target_ref
+        if target.endswith("image2.jpg"):
+            shape.width = Inches(5.7)
+            shape.height = Inches(2.85)
+            return
+    raise RuntimeError("No se encontro la figura de arquitectura en el informe.")
+
+
 def main() -> None:
     if not REPORT.exists():
         raise FileNotFoundError(REPORT)
-    if not TRAINING_FIGURE.exists():
-        raise FileNotFoundError(TRAINING_FIGURE)
+    for figure_path in REPORT_FIGURES.values():
+        if not figure_path.exists():
+            raise FileNotFoundError(figure_path)
 
     document = Document(REPORT)
     update_text(document)
+    resize_architecture_figure(document)
     document.save(REPORT)
-    replace_embedded_figure(REPORT, TRAINING_FIGURE)
+    replace_embedded_figures(REPORT, REPORT_FIGURES)
     print(f"Informe actualizado: {REPORT}")
 
 

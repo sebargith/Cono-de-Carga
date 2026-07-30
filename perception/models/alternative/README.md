@@ -11,7 +11,6 @@ python scripts/run_pipeline_from_videos.py `
   --yolo-model "perception\models\alternative\best.pt" `
   --class-id 0 `
   --run-name "prueba_modelo_alternativo" `
-  --start-docker `
   --overwrite
 ```
 

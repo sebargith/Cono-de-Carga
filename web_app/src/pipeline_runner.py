@@ -16,7 +16,6 @@ class PipelineParams:
     max_frames_per_video: int | None
     conf: float
     device: str
-    start_docker: bool
     video_min_valid_ratio: float
     video_majority_ratio: float
 
@@ -47,8 +46,6 @@ def build_command(paths: RunPaths, params: PipelineParams) -> list[str]:
     ]
     if params.max_frames_per_video is not None:
         command.extend(["--max-frames-per-video", str(params.max_frames_per_video)])
-    if params.start_docker:
-        command.append("--start-docker")
     return command
 
 
