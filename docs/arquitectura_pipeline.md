@@ -231,7 +231,7 @@ python perception/scripts/predict_to_analytic_masks.py ...
 
 El pipeline le pasa:
 
-- ruta del modelo `best.pt`,
+- ruta del único modelo entrenado de segmentacion vigente,
 - carpeta de frames,
 - carpeta destino de mascaras,
 - confianza YOLO,
@@ -450,7 +450,8 @@ Esto tiene varias ventajas:
 - El analitico no necesita saber si la mascara viene de CVAT o de YOLO.
 - La web app no necesita conocer detalles internos de OpenCV, YOLO o del analitico.
 - Cada etapa puede probarse por separado.
-- Si se cambia el modelo YOLO, basta con mantener el mismo formato de mascaras.
+- Si se actualiza el modelo de segmentacion, se debe mantener el mismo formato
+  de mascaras.
 - Si se mejora el analitico, basta con mantener `features.csv` y overlays como salida.
 
 ## Que pasa si falla una etapa

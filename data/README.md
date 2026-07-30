@@ -2,7 +2,8 @@
 
 Esta carpeta no se versiona en Git.
 
-- `benchmarks/prueba_tecnica_90/`: 90 imágenes clasificadas manualmente en
+- `benchmarks/prueba_tecnica_90/`: conjunto balanceado de evaluación de
+  rendimiento del analítico, con 90 imágenes clasificadas manualmente en
   centrado, izquierda y derecha.
 - `benchmarks/muestra_1248/`: muestra utilizada para el análisis global.
 - `pipeline_input/videos/`: videos locales para probar el pipeline.

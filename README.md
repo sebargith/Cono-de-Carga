@@ -22,10 +22,11 @@ video local
 → CSV, JSON y overlays
 ```
 
-El modelo principal es `perception/models/primary/psinet_carga_visible.pt`. La
-carga corresponde a la clase `material` (`class_id=1`). Como alternativa se
-conserva `perception/models/alternative/best.pt`, entrenado en este proyecto y
-con clase `Carga` (`class_id=0`).
+El pipeline considera un único modelo entrenado de segmentación:
+`perception/models/primary/psinet_carga_visible.pt`. La carga corresponde a la
+clase `material` (`class_id=1`). La segmentación es una etapa auxiliar; el
+resultado del proyecto corresponde al analítico geométrico aplicado sobre sus
+máscaras.
 
 ## Ejecución desde video
 

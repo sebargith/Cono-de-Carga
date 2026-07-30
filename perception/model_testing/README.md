@@ -1,6 +1,9 @@
-# Pruebas de modelos
+# Pruebas técnicas de segmentación
 
-Usa este directorio para probar modelos entrenados sin mezclar archivos con el dataset ni con las corridas de entrenamiento.
+Este directorio conserva herramientas históricas para probar checkpoints sin
+mezclar archivos con el dataset ni con las corridas de entrenamiento. El flujo
+vigente de la Memoria considera un único modelo entrenado de segmentación; los
+checkpoints depositados aquí no pasan a ser modelos adicionales del proyecto.
 
 Estructura:
 

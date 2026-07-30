@@ -83,17 +83,10 @@ D:\Memoria\Cono\outputs\pipeline_runs\prueba_videos_01\
   pipeline_summary.json
 ```
 
-El modelo principal usa la clase `material` (`class_id=1`), seleccionada por
-la configuración. Para probar el checkpoint alternativo:
-
-```powershell
-python scripts\run_pipeline_from_videos.py `
-  --videos-dir "data\pipeline_input\videos" `
-  --run-name "prueba_modelo_alternativo" `
-  --yolo-model "perception\models\alternative\best.pt" `
-  --class-id 0 `
-  --overwrite
-```
+El único modelo entrenado de segmentación considerado por el pipeline usa la
+clase `material` (`class_id=1`), seleccionada por la configuración. Los
+checkpoints históricos almacenados en otras carpetas no forman parte del flujo
+vigente.
 
 ## Veredicto Por Video
 

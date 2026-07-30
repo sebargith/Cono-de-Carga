@@ -43,7 +43,11 @@ Fuentes oficiales:
 
 **PSINet** es la empresa colaboradora y contraparte técnica del proyecto. Su actividad se concentra en soluciones e integraciones tecnológicas para minería. Según su información institucional, el Grupo PSINet opera desde 2001 y trabaja en infraestructura tecnológica, redes industriales, servicios IT y OT, monitoreo, control y analítica, además de telecomunicaciones y automatización minera.
 
-En el proyecto Cono de Carga, PSINet vincula la investigación con la aplicación industrial: está asociada al acceso y contexto de los datos, al modelo de percepción principal y a la orientación práctica de la solución. El peso PSINet versionado en `perception/models/primary/` es el segmentador usado por defecto.
+En el proyecto Cono de Carga, PSINet vincula la investigación con la aplicación
+industrial: está asociada al acceso y contexto de los datos y a la orientación
+práctica de la solución. El pipeline utiliza un único modelo entrenado de
+segmentación de carga, versionado en `perception/models/primary/`, como etapa
+auxiliar para generar las máscaras que consume el analítico geométrico.
 
 Fuente oficial:
 
@@ -102,9 +106,10 @@ video local
 
 También existe una web app local en Streamlit que permite subir videos, ejecutar el pipeline y revisar consola, overlays, estadísticas, veredicto y archivos descargables.
 
-El mejor resultado cuantitativo obtenido hasta ahora corresponde al modelo
-principal PSINet, usando su clase `material` y los umbrales analíticos actuales.
-En una prueba balanceada de 90 imágenes consiguió:
+El resultado cuantitativo principal obtenido hasta ahora corresponde al
+**rendimiento del analítico geométrico completo**, alimentado por las máscaras
+del modelo entrenado de segmentación y usando los umbrales analíticos actuales.
+En una prueba balanceada de 90 imágenes obtuvo:
 
 ```text
 80/90 correctas
@@ -112,15 +117,20 @@ En una prueba balanceada de 90 imágenes consiguió:
 90/90 imágenes evaluables
 ```
 
-Este modelo ya está conectado al pipeline general y a la aplicación web. La
-configuración selecciona `class_id=1` por defecto; el parámetro también puede
-sobrescribirse desde los orquestadores.
+Este 88,89 % mide la concordancia del analítico con las clases visuales
+esperadas (`centrado`, `izquierda` y `derecha`). No es una métrica aislada del
+modelo de segmentación ni una medición física del balance, centro de masa o
+distribución real del payload.
 
-La etapa de percepción no es exclusiva de Cono. El checkpoint principal es el
-mismo archivo binario utilizado por Granulometría para aislar la superficie
-visible del material. Ambos subproyectos comparten, por tanto, el modelo y la
-semántica de la clase `material`, pero aplican adaptadores y postprocesamientos
-distintos antes de ejecutar sus analíticos específicos.
+El modelo de segmentación ya está conectado al pipeline general y a la
+aplicación web. La configuración selecciona `class_id=1` por defecto; el
+parámetro también puede sobrescribirse desde los orquestadores.
+
+La etapa de segmentación no es exclusiva de Cono. El mismo archivo binario se
+utiliza en Granulometría para aislar la superficie visible del material. Ambos
+subproyectos comparten, por tanto, un único modelo y la semántica de la clase
+`material`, pero aplican adaptadores y postprocesamientos distintos antes de
+ejecutar sus analíticos específicos.
 
 ## 3. Alcance conceptual y terminología
 
@@ -200,20 +210,21 @@ La irregularidad tampoco es una clase final en la versión actual. `profile_roug
 ### 16 y 17 de julio de 2026
 
 - Se creó la evaluación cuantitativa de prueba técnica.
-- Se ajustaron umbrales y pesos del analítico.
-- Se comparó el checkpoint entrenado en el proyecto con el modelo principal PSINet.
+- Se continuó el ajuste de umbrales, pesos y sensibilidad del analítico mediante
+  varias pruebas de desarrollo, no restringidas al conjunto de 90 imágenes.
 - Se agregaron reportes, matriz de confusión y comparaciones visuales por clase.
 
 ### 23 de julio de 2026
 
-- Se repitió la prueba técnica de 90 imágenes con el modelo principal.
-- Se verificó la reproducibilidad del 88,89 % de exactitud.
+- Se repitió la evaluación de rendimiento del analítico sobre las 90 imágenes.
+- Se reprodujo el resultado de 88,89 % de exactitud del analítico.
 - Se incorporaron indicadores geométricos resumidos y distribuciones exportables.
 
 ### 30 de julio de 2026
 
 - Se reorganizaron código, modelos, resultados y entregables del repositorio.
-- Se consolidó PSINet como segmentador operacional y `best.pt` como alternativa.
+- Se consolidó un único modelo entrenado de segmentación como etapa auxiliar
+  operacional; los checkpoints de desarrollo quedaron solo como antecedentes.
 - Se migró la inferencia de YOLO desde Docker hacia el entorno Python local.
 - Docker quedó reservado para preparación, entrenamiento, validación y MLflow.
 - Se incorporaron pruebas automatizadas de inferencia local y estadísticas.
@@ -593,7 +604,7 @@ Cada overlay muestra:
 - `num_peaks`;
 - error cuando el frame no es evaluable.
 
-## 8. Base de percepción YOLO compartida
+## 8. Segmentación auxiliar con YOLO
 
 ### 8.1 Entornos de ejecución
 
@@ -677,7 +688,7 @@ Contiene URI y credenciales. No copiar sus secretos a documentación ni Git.
 
 `boto3` es obligatorio cuando MLflow guarda artefactos en S3/MinIO.
 
-### 8.4 Entrenamiento YOLO original
+### 8.4 Antecedente de entrenamiento YOLO
 
 Run:
 
@@ -710,7 +721,7 @@ epoch final masks mAP50-95: 0.91647
 
 Estas métricas provienen de un conjunto de validación pequeño de 36 imágenes y no equivalen al desempeño end-to-end de clasificación geométrica en cámaras o fechas distintas.
 
-Checkpoint alternativo versionado:
+Checkpoint de desarrollo conservado:
 
 ```text
 perception\models\alternative\best.pt
@@ -723,10 +734,11 @@ SHA256 conocido:
 ```
 
 Las copias redundantes de este archivo y de `last.pt` fueron eliminadas. Se
-conserva un solo `best.pt` como respaldo y referencia del entrenamiento hecho en
-el repositorio.
+conserva un solo `best.pt` como antecedente reproducible del entrenamiento
+realizado en el repositorio. No se considera un segundo modelo del proyecto ni
+forma parte del flujo analítico vigente.
 
-### 8.5 Modelo principal PSINet
+### 8.5 Modelo entrenado de segmentación utilizado
 
 Archivo local:
 
@@ -762,11 +774,13 @@ Para segmentar carga se selecciona:
 Este valor se encuentra en `prediction.class_id` dentro de
 `perception/configs/perception_config.yaml`.
 
-El archivo PSINet está versionado como modelo principal en la rama `main`.
+Este es el único modelo de segmentación considerado por el flujo vigente. El
+archivo está versionado en la rama `main`; su nombre y ubicación se conservan
+por compatibilidad y reproducibilidad técnica.
 
 #### Correspondencia con Granulometría
 
-El checkpoint principal de Cono es binariamente idéntico al utilizado por el
+El modelo de segmentación de Cono es binariamente idéntico al utilizado por el
 proyecto de Granulometría:
 
 ```text
@@ -786,26 +800,19 @@ SHA256: BD7C9880D9A39B291DC03669DAD774DB9FD933D6026DF694EEE1E3A41CBF1DAB
 clases: 0=caex, 1=material
 ```
 
-También existe en ambos proyectos una copia binariamente idéntica del
-checkpoint alternativo `best.pt`, con SHA256:
-
-```text
-11BF01302CABD3EAE1CFE65FDAD12B08FB1AA750493D976148CEABA9D35E336C
-```
-
-Que los pesos sean comunes no significa que exista todavía un único paquete de
-percepción compartido. Cada repositorio conserva su copia para mantener el
-pipeline encapsulado y dispone de su propio adaptador. Antes de centralizar los
-pesos o el código se deben estabilizar las rutas, el contrato de salida y las
-configuraciones de inferencia de ambos consumidores.
+Que el modelo sea común no significa que exista todavía un único paquete de
+segmentación compartido. Cada repositorio conserva su copia para mantener el
+pipeline encapsulado y dispone de su propio adaptador. Antes de centralizar el
+peso o el código se deben estabilizar las rutas, el contrato de salida y las
+configuraciones de ambos consumidores.
 
 ### 8.6 Configuración específica de cada consumidor
 
-La base de percepción común se usa actualmente con parámetros distintos:
+El modelo común de segmentación se usa actualmente con parámetros distintos:
 
 | Parámetro | Cono de Carga | Granulometría |
 |---|---:|---:|
-| Checkpoint principal | mismo SHA256 PSINet | mismo SHA256 PSINet |
+| Modelo de segmentación | mismo SHA256 | mismo SHA256 |
 | Clase de material | `1` | `1` |
 | `imgsz` predeterminado | `640` | `736` |
 | Confianza predeterminada | `0.35` | `0.25` |
@@ -816,12 +823,13 @@ En Cono, `largest` reduce el riesgo de incorporar acopios exteriores como parte
 de la carga. El adaptador genera una máscara RGB compatible con CVAT y el
 analítico. Granulometría puede unir instancias antes de recortar, normalizar y
 dividir la carga en patches. Estas decisiones pertenecen a los consumidores de
-la percepción y deben mantenerse separadas de la identidad del checkpoint.
+la segmentación y deben mantenerse separadas de la identidad del checkpoint.
 
-La evaluación de 88,89 % de Cono se obtuvo con `imgsz=640`, `conf=0.35`,
-`class_id=1` y `largest`. No se deben unificar parámetros con Granulometría sin
-una comparación controlada, porque cambiarían las máscaras y la referencia
-cuantitativa vigente.
+El rendimiento de 88,89 % del analítico de Cono se obtuvo con máscaras
+generadas usando `imgsz=640`, `conf=0.35`, `class_id=1` y `largest`. Estos datos
+se conservan para reproducir la evaluación, no para establecer una comparación
+entre modelos. No se deben unificar parámetros con Granulometría sin validar el
+efecto sobre las máscaras y los resultados de ambos analíticos.
 
 ### 8.7 Adaptador YOLO -> analítico
 
@@ -954,13 +962,14 @@ Lógica:
 
 Se guardan conteos, ratios, medianas, medias, confianza y motivo del veredicto.
 
-### 9.2 Selección de modelo y clase
+### 9.2 Modelo de segmentación y clase
 
-El pipeline utiliza `perception/models/primary/psinet_carga_visible.pt` y
+El pipeline utiliza el único modelo de segmentación vigente,
+`perception/models/primary/psinet_carga_visible.pt`, y
 `prediction.class_id: 1` de forma predeterminada. `run_pipeline_from_videos.py`
 y `run_manager_sample_from_images.py` exponen `--class-id` y lo propagan al
-adaptador. El checkpoint `perception/models/alternative/best.pt` sigue
-disponible para comparación, pero debe ejecutarse con `--class-id 0`.
+adaptador. Los checkpoints de desarrollo conservados fuera de esta ruta son
+antecedentes históricos y no forman parte del flujo ni de la evaluación actual.
 
 ## 10. Web app local
 
@@ -1025,8 +1034,8 @@ El lanzador:
 - utiliza un puerto separado para no interferir con la aplicacion de
   Granulometria, que puede estar ejecutandose en `8501`.
 
-La web app usa el modelo principal definido en `run_pipeline_from_videos.py`;
-por tanto, ejecuta PSINet con la clase `material` configurada.
+La web app usa el modelo entrenado de segmentación definido en
+`run_pipeline_from_videos.py`, con la clase `material` configurada.
 
 ## 11. Frame Hunter y videos
 
@@ -1075,6 +1084,12 @@ Derecha\    30 imágenes
 
 Total: 90 imágenes seleccionadas manualmente por apariencia visual.
 
+Los umbrales y la sensibilidad del analítico se ajustaron mediante varias
+pruebas de desarrollo con distintas muestras y corridas; el proceso no se
+limitó a estas 90 imágenes. Este conjunto balanceado se utiliza aquí como
+evaluación de rendimiento del analítico geométrico con su configuración
+vigente.
+
 ### 12.2 Herramientas
 
 Procesamiento masivo:
@@ -1105,59 +1120,30 @@ El evaluador genera:
 - reporte PNG con exactitud, matriz de confusión e indicadores geométricos;
 - originales y overlays por clase esperada.
 
-### 12.3 Evolución de sensibilidad con YOLO original
+### 12.3 Antecedentes del ajuste de sensibilidad
 
-Primera configuración evaluada:
+El ajuste de parámetros incluyó múltiples pruebas de desarrollo, tanto sobre
+la sensibilidad lateral como sobre el equilibrio entre las señales de pico y
+área. Entre las configuraciones exploradas estuvieron:
 
-```text
-threshold_peak = 0.09
-threshold_area = 0.10
-pesos = 0.6 / 0.4
-54/90 correctas
-60,00 %
-89/90 evaluables
-```
+| `threshold_peak` | `threshold_area` | Pesos pico/área |
+|---:|---:|---:|
+| 0.09 | 0.10 | 0.6 / 0.4 |
+| 0.08 | 0.09 | 0.6 / 0.4 |
+| 0.06 | 0.07 | 0.5 / 0.5 |
 
-Segunda configuración:
+La última combinación quedó vigente porque aumentó la sensibilidad a
+tendencias laterales manteniendo un comportamiento aceptable en centrado.
+Estas configuraciones documentan parte de un proceso de pruebas más amplio; no
+deben interpretarse como un ajuste realizado exclusivamente sobre el conjunto
+de 90 imágenes ni como una comparación entre modelos de segmentación.
 
-```text
-threshold_peak = 0.08
-threshold_area = 0.09
-pesos = 0.6 / 0.4
-58/90 correctas
-64,44 %
-89/90 evaluables
-```
+### 12.4 Rendimiento del analítico geométrico
 
-Configuración vigente:
+La evaluación del flujo vigente utilizó:
 
 ```text
-threshold_peak = 0.06
-threshold_area = 0.07
-pesos = 0.5 / 0.5
-63/90 correctas
-70,00 %
-89/90 evaluables
-```
-
-Resultado por clase de esa última corrida con YOLO original:
-
-```text
-Centrado: 19/30 = 63,33 %
-Izquierda: 25/30 = 83,33 %
-Derecha: 19/30 = 63,33 %
-```
-
-El aumento de sensibilidad mejoró laterales, pero redujo aciertos en centrado.
-
-### 12.4 Resultado del modelo principal
-
-Primero se ejecutó por error con clase `0: caex`. Esa corrida produjo 54 descartes por tocar bordes y solo 5/90 aciertos. No debe usarse como evaluación de carga.
-
-La corrida correcta utilizó:
-
-```text
-PSINet principal
+modelo entrenado de segmentación como etapa auxiliar
 class_id = 1 (material)
 conf = 0.35
 mask_mode = largest
@@ -1166,7 +1152,7 @@ threshold_area = 0.07
 pesos = 0.5 / 0.5
 ```
 
-Resultados:
+Resultado de rendimiento del analítico:
 
 ```text
 90/90 evaluables
@@ -1190,14 +1176,16 @@ Izquierda: 28/30 = 93,33 %
 Derecha: 30/30 = 100,00 %
 ```
 
-El modelo principal mejoró 17 imágenes y 18,89 puntos porcentuales respecto de
-la mejor corrida con el checkpoint que ahora se conserva como alternativa.
+Por tanto, el 88,89 % es la exactitud del **analítico geométrico** sobre las 90
+imágenes con etiquetas visuales de referencia. El modelo de segmentación
+participa únicamente como generador de máscaras dentro del flujo evaluado; este
+porcentaje no se presenta como una métrica propia del segmentador.
 
 ### 12.5 Repetición con indicadores geométricos
 
-El 23 de julio de 2026 se repitió la prueba completa con la misma configuración
-del modelo principal para comprobar la reproducibilidad e incorporar los nuevos
-indicadores al reporte. La corrida obtuvo nuevamente:
+El 23 de julio de 2026 se repitió la evaluación completa con la misma
+configuración del analítico para incorporar los nuevos indicadores al reporte.
+La corrida reprodujo el resultado de rendimiento:
 
 ```text
 90/90 imágenes con predicción YOLO
@@ -1227,7 +1215,8 @@ Estos valores muestran una separación consistente entre las tres clases. El cen
 P25 y P75 permanecen disponibles en `indicadores_geometricos.csv`, pero se
 retiraron de la imagen resumen para reducir densidad visual.
 
-El resumen de rendimiento de percepción para las 90 imágenes fue:
+Los tiempos técnicos de la etapa auxiliar de segmentación para las 90 imágenes
+fueron:
 
 ```text
 inferencia YOLO acumulada: 1,673 s
@@ -1286,7 +1275,9 @@ Esto puede alterar:
 
 ### 13.2 `merge_all` no es una solución general
 
-En una imagen inspeccionada, YOLO original generó dos instancias. La segunda no era un trozo de carga omitido, sino un acopio exterior. `merge_all` habría contaminado la máscara y hecho que tocara bordes.
+En una imagen inspeccionada, el modelo de segmentación generó dos instancias.
+La segunda no era un trozo de carga omitido, sino un acopio exterior.
+`merge_all` habría contaminado la máscara y hecho que tocara bordes.
 
 Sin ROI o máscara de tolva, `largest` sigue siendo el modo más prudente.
 
@@ -1297,9 +1288,7 @@ Se observaron omisiones en:
 - zonas oscuras u ocluidas;
 - material muy claro o sobreexpuesto;
 - fragmentos aislados en laterales;
-- cámaras/fechas distintas a las del entrenamiento inicial.
-
-El YOLO original fue entrenado con datos principalmente de Camera 8/2024, mientras la prueba técnica contiene Camera 7 y 8 de 2025. Existe cambio de dominio.
+- variaciones de cámara, fecha e iluminación.
 
 Subir `imgsz` a 960 o 1280 puede ayudar con detalle, pero la corrección principal es reentrenar o ajustar con ejemplos representativos y anotaciones consistentes.
 
@@ -1361,7 +1350,7 @@ docker compose up -d
 docker compose exec cone-yolo python scripts/prepare_yolo_dataset.py --overwrite
 ```
 
-### 15.3 Entrenar YOLO original desde arquitectura
+### 15.3 Reproducir el antecedente de entrenamiento desde arquitectura
 
 ```powershell
 docker compose exec cone-yolo python scripts/train_yolo_seg.py `
@@ -1374,7 +1363,7 @@ docker compose exec cone-yolo python scripts/train_yolo_seg.py `
   --device 0
 ```
 
-### 15.4 Ejecutar directamente el modelo principal
+### 15.4 Ejecutar directamente la segmentación
 
 ```powershell
 cd D:\Memoria\Cono
@@ -1405,8 +1394,8 @@ python scripts\run_pipeline_from_videos.py `
   --overwrite
 ```
 
-Este comando usa el modelo principal PSINet por defecto y realiza la inferencia
-localmente.
+Este comando usa por defecto el único modelo entrenado de segmentación del
+pipeline y realiza la inferencia localmente.
 
 ### 15.6 Web app
 
@@ -1433,9 +1422,9 @@ visual y una suite automatizada inicial:
 - pruebas Data prueba 1, 2 y 3;
 - inspección de overlays;
 - procesamiento desde videos locales;
-- prueba técnica balanceada de 90 imágenes;
+- evaluación balanceada de rendimiento del analítico sobre 90 imágenes;
 - matrices de confusión y exactitud por clase;
-- comparación entre dos modelos de percepción.
+- repetición del resultado de rendimiento con indicadores geométricos.
 
 En `tests/` existen cuatro pruebas automatizadas versionadas:
 
@@ -1459,10 +1448,11 @@ Windows/Unicode.
 - Máscara principal: `largest`.
 - Descarte si toca cualquier borde.
 - Mediciones relativas a la máscara de carga.
-- Modelo principal: PSINet con clase `material=1`.
-- El mismo checkpoint principal es la base de percepción de Granulometría.
-- Modelo alternativo: `models/alternative/best.pt` con clase `Carga=0`.
-- Mejor resultado técnico: 88,89 % en 90 imágenes.
+- Un único modelo entrenado de segmentación, con clase `material=1`, como etapa
+  auxiliar del analítico.
+- El mismo archivo binario de segmentación se utiliza en Granulometría.
+- Rendimiento vigente del analítico geométrico: 88,89 % en 90 imágenes
+  balanceadas, con 90/90 evaluables.
 
 ### No se considera resuelto
 
@@ -1472,13 +1462,14 @@ Windows/Unicode.
 - Calibración sobre más cámaras, iluminación y fechas.
 - Validación temporal por secuencias independientes.
 - Cobertura automatizada completa de geometría, reglas y pipeline.
-- Definición de un modelo de producción y su versionado formal.
+- Despliegue compartido y versionado formal del modelo de segmentación.
 
 ## 18. Próximos pasos recomendados
 
 Prioridad 1:
 
-1. Repetir la prueba técnica desde el pipeline completo después de cambios de percepción.
+1. Repetir la evaluación de rendimiento desde el pipeline completo después de
+   cambios en la segmentación.
 2. Agregar validación automática de los nombres de clases del modelo.
 3. Controlar máscaras incompletas que no alcanzan el borde de imagen.
 
@@ -1503,11 +1494,10 @@ Prioridad 3:
 - No interpretar bbox o centroide como información física del camión.
 - No asumir que un bbox incompleto es un error del bbox: primero revisar la máscara YOLO.
 - No usar `merge_all` indiscriminadamente sin ROI de tolva.
-- No ejecutar el modelo principal con `class_id=0` para carga; eso selecciona `caex`.
-- No ejecutar el checkpoint alternativo con `class_id=1`; su carga es la clase 0.
+- El modelo de segmentación vigente debe ejecutarse con `class_id=1`
+  (`material`); `class_id=0` selecciona `caex`.
 - No asumir que los parámetros de inferencia son comunes solo porque Cono y
   Granulometría usan el mismo checkpoint.
-- No comparar la corrida errónea de clase `caex` con los resultados válidos.
 - No asumir que mAP de segmentación implica la misma exactitud del analítico.
 - No asumir que los paths guardados en CSV siguen válidos después de mover outputs.
 - No revelar `.env.mlflow` ni credenciales de Nextcloud.
@@ -1545,17 +1535,18 @@ Prioridad 3:
 ## 21. Conclusión técnica
 
 El proyecto ya dispone de un pipeline funcional de extremo a extremo y de una
-validación cuantitativa inicial. La geometría es simple, interpretable y
+evaluación cuantitativa inicial. La geometría es simple, interpretable y
 trazable, pero depende directamente de la calidad de segmentación y de
-referencias internas a la máscara. El salto de 70,0 % con el checkpoint
-alternativo a 88,89 % con el modelo principal confirma que la percepción es
-actualmente el factor más determinante.
+referencias internas a la máscara. Con la configuración vigente, el analítico
+geométrico alcanza 80/90 aciertos, equivalentes a 88,89 %, sobre el conjunto
+balanceado de rendimiento.
 
-El modelo operacional de segmentación es una base común con Granulometría. La
-separación entre proyectos ocurre después de obtener la máscara: Cono construye
-descriptores geométricos internos, mientras Granulometría normaliza la carga y
-clasifica patches. Mantener explícito este límite permite compartir percepción
-sin confundir los objetivos, parámetros y evaluaciones de cada analítico.
+El único modelo entrenado de segmentación se usa como etapa auxiliar común con
+Granulometría. La separación entre proyectos ocurre después de obtener la
+máscara: Cono construye descriptores geométricos internos, mientras
+Granulometría normaliza la carga y clasifica patches. Mantener explícito este
+límite permite compartir la segmentación sin confundir los objetivos,
+parámetros y evaluaciones de cada analítico.
 
 Los cambios de mayor valor son fortalecer el control de calidad de máscaras,
 resolver explícitamente los casos geométricos ambiguos y ampliar la validación a

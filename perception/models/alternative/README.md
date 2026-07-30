@@ -1,17 +1,9 @@
-# Modelo alternativo
+# Checkpoint histórico de desarrollo
 
 `best.pt` corresponde al checkpoint YOLOv8n-seg entrenado durante el desarrollo
-del proyecto. Se conserva para comparación, respaldo y pruebas controladas.
+del proyecto. Se conserva únicamente como antecedente reproducible del
+entrenamiento y no forma parte del flujo vigente, de la evaluación de
+rendimiento ni de una comparación de modelos para la Memoria.
 
-Para utilizarlo en el pipeline:
-
-```powershell
-python scripts/run_pipeline_from_videos.py `
-  --videos-dir "data\pipeline_input\videos" `
-  --yolo-model "perception\models\alternative\best.pt" `
-  --class-id 0 `
-  --run-name "prueba_modelo_alternativo" `
-  --overwrite
-```
-
-Este modelo contiene una sola clase de carga, con `class_id=0`.
+La clase de carga de este artefacto histórico era `class_id=0`; este dato se
+mantiene solo para interpretar corridas archivadas.

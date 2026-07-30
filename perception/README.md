@@ -217,8 +217,8 @@ Todo queda dentro de `D:\Memoria\Cono\perception`:
 data/raw/        exportaciones CVAT de entrada
 data/yolo/       dataset YOLO generado
 runs/            corridas de train/val/predict
-models/primary/  modelo principal usado por el pipeline
-models/alternative/ checkpoint alternativo versionado
+models/primary/  modelo de segmentación usado por el pipeline
+models/alternative/ antecedente histórico de entrenamiento
 models/<run>/    pesos generados por nuevos entrenamientos
 mlruns/          tracking local de MLflow
 .cache/          cache de Ultralytics/Matplotlib
@@ -428,7 +428,7 @@ python perception\scripts\predict_to_analytic_masks.py `
 ```
 
 La configuración selecciona `class_id=1`, correspondiente a `material` en el
-modelo principal PSINet.
+modelo entrenado de segmentación.
 
 Este script guarda una mascara `.png` por frame con el mismo nombre base:
 
@@ -452,8 +452,7 @@ Por defecto, si YOLO detecta mas de una instancia de carga en el frame, se conse
 
 ```powershell
 python perception\scripts\predict_to_analytic_masks.py `
-  --model "perception\models\alternative\best.pt" `
-  --class-id 0 `
+  --model "perception\models\primary\psinet_carga_visible.pt" `
   --images-dir "<carpeta_de_frames>" `
   --masks-dir "perception\model_testing\analytic_masks\<nombre_prueba>" `
   --mask-mode merge_all `
@@ -479,19 +478,19 @@ D:\Memoria\Cono\outputs\pipeline_yolo_masks_prueba_01\tables\features.csv
 D:\Memoria\Cono\outputs\pipeline_yolo_masks_prueba_01\overlays\
 ```
 
-## 9. Modelos Versionados
+## 9. Modelo Versionado
 
-El repositorio conserva dos pesos con funciones distintas:
+El flujo vigente considera un único modelo entrenado de segmentación:
 
 ```text
 D:\Memoria\Cono\perception\models\primary\psinet_carga_visible.pt
-D:\Memoria\Cono\perception\models\alternative\best.pt
 ```
 
-El primero es el segmentador operativo y usa la clase `material`
-(`class_id=1`). El segundo es el checkpoint entrenado en este repositorio y usa
-la clase `Carga` (`class_id=0`). También se conserva un caso de inferencia
-reproducible con 24 imágenes de entrada y sus resultados:
+Usa la clase `material` (`class_id=1`). El archivo
+`perception\models\alternative\best.pt` se mantiene solo como antecedente
+histórico de entrenamiento y no se considera un segundo modelo del proyecto.
+También se conserva un caso de inferencia reproducible con 24 imágenes de
+entrada y sus resultados:
 
 ```text
 D:\Memoria\Cono\perception\model_testing\reference\prueba_01\

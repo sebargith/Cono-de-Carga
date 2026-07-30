@@ -1,6 +1,6 @@
-# Caso de referencia: prueba_01
+# Caso histórico de referencia: prueba_01
 
-Este snapshot conserva una prueba de inferencia ejecutada con:
+Este snapshot conserva una prueba histórica de inferencia ejecutada con:
 
 ```text
 models/alternative/best.pt
@@ -13,9 +13,12 @@ sources/   24 imagenes originales
 outputs/   24 imagenes con las predicciones dibujadas por YOLO-seg
 ```
 
-El caso sirve como referencia visual inicial. Las pruebas futuras deben ejecutarse en `model_testing/sources/` y `model_testing/outputs/`, que permanecen fuera de Git.
+El caso sirve únicamente como referencia visual inicial y no forma parte del
+flujo ni de la evaluación de rendimiento vigentes. Las pruebas futuras deben
+ejecutarse en `model_testing/sources/` y `model_testing/outputs/`, que
+permanecen fuera de Git.
 
-Para repetir la inferencia sobre las entradas versionadas:
+El comando siguiente se conserva solo para reproducir ese snapshot histórico:
 
 ```powershell
 cd D:\Memoria\Cono
