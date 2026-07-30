@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import csv
 import json
+import math
 import re
 import shutil
 import subprocess
@@ -16,11 +17,85 @@ import cv2
 
 
 ROOT = Path(__file__).resolve().parents[1]
+SRC_DIR = ROOT / "src"
+if str(SRC_DIR) not in sys.path:
+    sys.path.insert(0, str(SRC_DIR))
+
+from cone_load.statistics import (  # noqa: E402
+    indicator_distribution_rows,
+    indicator_summary_rows,
+    summarize_indicators,
+)
+
 DEFAULT_MODEL = (
-    "perception/models/reference/"
-    "carga_visible_yolov8n-seg_20260527_195509/best.pt"
+    "perception/models/primary/psinet_carga_visible.pt"
 )
 VIDEO_EXTENSIONS = (".mp4", ".avi", ".mov", ".mkv", ".m4v")
+CLASS_CENTERED = "centrado"
+CLASS_LEFT = "izquierda"
+CLASS_RIGHT = "derecha"
+CLASS_NO_EVALUABLE = "no_evaluable"
+VERDICT_CENTERED = "carga_centrada"
+VERDICT_LEFT = "tendencia_izquierda"
+VERDICT_RIGHT = "tendencia_derecha"
+VERDICT_MIXED = "mixto_o_inestable"
+VERDICT_NO_EVALUABLE = "no_evaluable"
+VIDEO_SUMMARY_COLUMNS = [
+    "video_name",
+    "video_id",
+    "video_path",
+    "total_frames",
+    "analytic_rows",
+    "valid_frames",
+    "invalid_frames",
+    "valid_ratio",
+    "centrado_count",
+    "izquierda_count",
+    "derecha_count",
+    "no_evaluable_count",
+    "centrado_ratio",
+    "izquierda_ratio",
+    "derecha_ratio",
+    "p25_peak_x_norm",
+    "median_peak_x_norm",
+    "p75_peak_x_norm",
+    "mean_peak_x_norm",
+    "p25_area_symmetry",
+    "median_area_symmetry",
+    "p75_area_symmetry",
+    "mean_area_symmetry",
+    "p25_centroid_x_norm",
+    "median_centroid_x_norm",
+    "p75_centroid_x_norm",
+    "mean_centroid_x_norm",
+    "mean_profile_roughness",
+    "mean_num_peaks",
+    "final_verdict",
+    "confidence",
+    "verdict_reason",
+]
+INDICATOR_SUMMARY_COLUMNS = [
+    "scope_type",
+    "scope_id",
+    "scope_name",
+    "indicator",
+    "indicator_label",
+    "count",
+    "p25",
+    "median",
+    "p75",
+]
+INDICATOR_DISTRIBUTION_COLUMNS = [
+    "scope_type",
+    "scope_id",
+    "scope_name",
+    "indicator",
+    "indicator_label",
+    "bin_index",
+    "bin_start",
+    "bin_end",
+    "count",
+]
 
 
 def parse_args() -> argparse.Namespace:
@@ -40,16 +115,17 @@ def parse_args() -> argparse.Namespace:
         "--work-dir",
         default=None,
         help=(
-            "Carpeta de trabajo visible para Docker. Debe quedar dentro de "
-            "perception/model_testing/pipeline_runs/."
+            "Carpeta de trabajo visible para Docker. Por defecto queda dentro "
+            "de perception/model_testing/pipeline_runs/. La web app puede usar "
+            "web_app/outputs/runs/."
         ),
     )
     parser.add_argument(
         "--output-dir",
         default=None,
         help=(
-            "Carpeta final de resultados. Debe quedar dentro de "
-            "outputs/pipeline_runs/."
+            "Carpeta final de resultados. Por defecto queda dentro de "
+            "outputs/pipeline_runs/. La web app puede usar web_app/outputs/runs/."
         ),
     )
     parser.add_argument(
@@ -81,6 +157,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--imgsz", type=int, default=None)
     parser.add_argument("--device", default="0")
     parser.add_argument(
+        "--class-id",
+        type=int,
+        default=None,
+        help="Clase YOLO que representa la carga. Por defecto usa la configuracion.",
+    )
+    parser.add_argument(
         "--mask-mode",
         choices=("largest", "merge_all"),
         default="largest",
@@ -100,6 +182,18 @@ def parse_args() -> argparse.Namespace:
         "--overwrite",
         action="store_true",
         help="Borra la corrida previa con el mismo run-name si existe.",
+    )
+    parser.add_argument(
+        "--video-min-valid-ratio",
+        type=float,
+        default=0.5,
+        help="Minima fraccion de frames validos para emitir veredicto por video.",
+    )
+    parser.add_argument(
+        "--video-majority-ratio",
+        type=float,
+        default=0.6,
+        help="Fraccion minima de frames validos que deben apoyar una clase dominante.",
     )
     return parser.parse_args()
 
@@ -135,11 +229,18 @@ def require_file(path: Path, name: str) -> Path:
     return path
 
 
-def prepare_clean_dir(path: Path, allowed_base: Path, overwrite: bool, label: str) -> Path:
+def prepare_clean_dir(
+    path: Path,
+    allowed_bases: list[Path],
+    overwrite: bool,
+    label: str,
+) -> Path:
     path = path.resolve()
-    allowed_base = allowed_base.resolve()
-    if not is_relative_to(path, allowed_base) or path == allowed_base:
-        raise ValueError(f"{label} debe quedar dentro de {allowed_base}: {path}")
+    resolved_bases = [base.resolve() for base in allowed_bases]
+    is_allowed = any(is_relative_to(path, base) and path != base for base in resolved_bases)
+    if not is_allowed:
+        bases = ", ".join(str(base) for base in resolved_bases)
+        raise ValueError(f"{label} debe quedar dentro de una de estas rutas: {bases}. Ruta: {path}")
 
     if path.exists() and not path.is_dir():
         raise NotADirectoryError(f"{label} existe pero no es un directorio: {path}")
@@ -195,6 +296,40 @@ def write_manifest_csv(path: Path, rows: list[dict[str, Any]], fieldnames: list[
         writer = csv.DictWriter(f, fieldnames=fieldnames)
         writer.writeheader()
         writer.writerows(rows)
+
+
+def load_yaml_config(path: Path) -> dict[str, Any]:
+    try:
+        import yaml
+    except ImportError:
+        return {}
+
+    try:
+        with path.open("r", encoding="utf-8") as f:
+            data = yaml.safe_load(f) or {}
+    except Exception:
+        return {}
+    return data if isinstance(data, dict) else {}
+
+
+def load_json_dict(path: Path) -> dict[str, Any]:
+    if not path.exists():
+        return {}
+    try:
+        with path.open("r", encoding="utf-8") as f:
+            data = json.load(f)
+    except (OSError, json.JSONDecodeError):
+        return {}
+    return data if isinstance(data, dict) else {}
+
+
+def nested_value(config: dict[str, Any], keys: tuple[str, ...], default: Any) -> Any:
+    current: Any = config
+    for key in keys:
+        if not isinstance(current, dict) or key not in current:
+            return default
+        current = current[key]
+    return current
 
 
 def extract_frames(
@@ -310,13 +445,20 @@ def perception_host_path(value: str | Path, perception_dir: Path) -> Path:
     )
 
 
-def to_container_path(host_path: Path, perception_dir: Path) -> str:
+def to_container_path(host_path: Path, perception_dir: Path, web_app_dir: Path | None = None) -> str:
     resolved = host_path.resolve()
     perception_root = perception_dir.resolve()
-    if not is_relative_to(resolved, perception_root):
-        raise ValueError(f"La ruta no esta montada en Docker: {resolved}")
-    rel = resolved.relative_to(perception_root)
-    return "/workspace/" + rel.as_posix()
+    mount_points: list[tuple[Path, str]] = [(perception_root, "/workspace")]
+    if web_app_dir is not None:
+        mount_points.append((web_app_dir.resolve(), "/workspace/web_app"))
+
+    for host_root, container_root in mount_points:
+        if is_relative_to(resolved, host_root):
+            rel = resolved.relative_to(host_root)
+            suffix = rel.as_posix()
+            return container_root if not suffix else f"{container_root}/{suffix}"
+
+    raise ValueError(f"La ruta no esta montada en Docker: {resolved}")
 
 
 def run_command(command: list[str], cwd: Path, label: str) -> None:
@@ -329,6 +471,7 @@ def run_command(command: list[str], cwd: Path, label: str) -> None:
 
 def run_yolo_masks(
     perception_dir: Path,
+    web_app_dir: Path | None,
     docker_service: str,
     yolo_model: Path,
     frames_dir: Path,
@@ -338,6 +481,7 @@ def run_yolo_masks(
     device: str,
     mask_mode: str,
     start_docker: bool,
+    class_id: int | None = None,
 ) -> None:
     if start_docker:
         run_command(["docker", "compose", "up", "-d"], perception_dir, "levantar Docker")
@@ -351,11 +495,11 @@ def run_yolo_masks(
         "python",
         "scripts/predict_to_analytic_masks.py",
         "--model",
-        to_container_path(yolo_model, perception_dir),
+        to_container_path(yolo_model, perception_dir, web_app_dir),
         "--images-dir",
-        to_container_path(frames_dir, perception_dir),
+        to_container_path(frames_dir, perception_dir, web_app_dir),
         "--masks-dir",
-        to_container_path(masks_dir, perception_dir),
+        to_container_path(masks_dir, perception_dir, web_app_dir),
         "--conf",
         str(conf),
         "--device",
@@ -366,6 +510,8 @@ def run_yolo_masks(
     ]
     if imgsz is not None:
         command.extend(["--imgsz", str(imgsz)])
+    if class_id is not None:
+        command.extend(["--class-id", str(class_id)])
 
     run_command(command, perception_dir, "YOLO a mascaras analiticas")
 
@@ -393,12 +539,324 @@ def read_csv_rows(path: Path) -> list[dict[str, str]]:
         return list(csv.DictReader(f))
 
 
+def bool_from_csv(value: str) -> bool:
+    return str(value).strip().lower() in {"true", "1", "yes", "si"}
+
+
+def finite_float_from_csv(value: Any) -> float | None:
+    try:
+        number = float(str(value).strip())
+    except (TypeError, ValueError):
+        return None
+    if not math.isfinite(number):
+        return None
+    return number
+
+
+def mean_or_nan(values: list[float]) -> float:
+    if not values:
+        return float("nan")
+    return float(sum(values) / len(values))
+
+
+def median_or_nan(values: list[float]) -> float:
+    if not values:
+        return float("nan")
+    ordered = sorted(values)
+    n = len(ordered)
+    middle = n // 2
+    if n % 2:
+        return float(ordered[middle])
+    return float((ordered[middle - 1] + ordered[middle]) / 2.0)
+
+
+def fmt_float(value: float) -> str:
+    if not math.isfinite(value):
+        return "nan"
+    return f"{value:.6f}"
+
+
+def ratio(count: int, denom: int) -> float:
+    return float(count / denom) if denom > 0 else 0.0
+
+
+def decide_video_verdict(
+    valid_ratio: float,
+    centered_ratio: float,
+    left_ratio: float,
+    right_ratio: float,
+    median_peak_x_norm: float,
+    median_area_symmetry: float,
+    min_valid_ratio: float,
+    majority_ratio: float,
+    threshold_peak: float,
+    threshold_area: float,
+) -> tuple[str, float, str]:
+    class_confidence = max(centered_ratio, left_ratio, right_ratio)
+    if valid_ratio < min_valid_ratio:
+        return VERDICT_NO_EVALUABLE, valid_ratio, "valid_ratio_bajo"
+
+    if left_ratio >= majority_ratio:
+        return VERDICT_LEFT, left_ratio, "mayoria_frames_izquierda"
+    if right_ratio >= majority_ratio:
+        return VERDICT_RIGHT, right_ratio, "mayoria_frames_derecha"
+    if centered_ratio >= majority_ratio:
+        return VERDICT_CENTERED, centered_ratio, "mayoria_frames_centrado"
+
+    peak_ok = math.isfinite(median_peak_x_norm)
+    area_ok = math.isfinite(median_area_symmetry)
+    if peak_ok and area_ok:
+        if (
+            abs(median_peak_x_norm) < threshold_peak
+            and abs(median_area_symmetry) < threshold_area
+        ):
+            return VERDICT_CENTERED, class_confidence, "medianas_geometricas_centradas"
+        if median_peak_x_norm < -threshold_peak or median_area_symmetry < -threshold_area:
+            return VERDICT_LEFT, class_confidence, "medianas_geometricas_izquierda"
+        if median_peak_x_norm > threshold_peak or median_area_symmetry > threshold_area:
+            return VERDICT_RIGHT, class_confidence, "medianas_geometricas_derecha"
+
+    return VERDICT_MIXED, class_confidence, "sin_mayoria_clara"
+
+
+def build_video_summary(
+    frame_manifest_rows: list[dict[str, Any]],
+    video_manifest_rows: list[dict[str, Any]],
+    feature_rows: list[dict[str, str]],
+    analytic_config: dict[str, Any],
+    min_valid_ratio: float,
+    majority_ratio: float,
+) -> list[dict[str, Any]]:
+    frame_to_video = {
+        str(row["frame_name"]): {
+            "video_name": str(row["video_name"]),
+            "video_id": str(row["video_id"]),
+            "video_path": str(row["video_path"]),
+        }
+        for row in frame_manifest_rows
+    }
+    by_video: dict[str, dict[str, Any]] = {}
+    for video_row in video_manifest_rows:
+        current_video_id = str(video_row["video_id"])
+        by_video[current_video_id] = {
+            "video_name": str(video_row["video_name"]),
+            "video_id": current_video_id,
+            "video_path": str(video_row["video_path"]),
+            "total_frames": int(video_row.get("saved_frames") or 0),
+            "features": [],
+        }
+
+    for feature in feature_rows:
+        frame_name = str(feature.get("image_name", ""))
+        frame_info = frame_to_video.get(frame_name)
+        if frame_info is None:
+            continue
+        current_video_id = frame_info["video_id"]
+        if current_video_id not in by_video:
+            by_video[current_video_id] = {
+                "video_name": frame_info["video_name"],
+                "video_id": current_video_id,
+                "video_path": frame_info["video_path"],
+                "total_frames": 0,
+                "features": [],
+            }
+        by_video[current_video_id]["features"].append(feature)
+
+    threshold_peak = float(nested_value(analytic_config, ("rules", "threshold_peak"), 0.12))
+    threshold_area = float(nested_value(analytic_config, ("rules", "threshold_area"), 0.12))
+    rows: list[dict[str, Any]] = []
+    for video_id_key in sorted(by_video):
+        item = by_video[video_id_key]
+        features = list(item["features"])
+        total_frames = int(item["total_frames"])
+        analytic_rows = len(features)
+        valid_features = [row for row in features if bool_from_csv(row.get("is_valid", ""))]
+        valid_frames = len(valid_features)
+        invalid_frames = max(total_frames - valid_frames, 0)
+        valid_ratio = ratio(valid_frames, total_frames)
+        class_counts = Counter(row.get("predicted_class", "") for row in features)
+        centered_count = int(class_counts.get(CLASS_CENTERED, 0))
+        left_count = int(class_counts.get(CLASS_LEFT, 0))
+        right_count = int(class_counts.get(CLASS_RIGHT, 0))
+        no_evaluable_count = int(class_counts.get(CLASS_NO_EVALUABLE, 0))
+        centered_ratio = ratio(centered_count, valid_frames)
+        left_ratio = ratio(left_count, valid_frames)
+        right_ratio = ratio(right_count, valid_frames)
+
+        peak_values = [
+            value
+            for value in (finite_float_from_csv(row.get("peak_x_norm")) for row in valid_features)
+            if value is not None
+        ]
+        area_values = [
+            value
+            for value in (finite_float_from_csv(row.get("area_symmetry")) for row in valid_features)
+            if value is not None
+        ]
+        centroid_values = [
+            value
+            for value in (
+                finite_float_from_csv(row.get("centroid_x_norm")) for row in valid_features
+            )
+            if value is not None
+        ]
+        roughness_values = [
+            value
+            for value in (
+                finite_float_from_csv(row.get("profile_roughness")) for row in valid_features
+            )
+            if value is not None
+        ]
+        num_peak_values = [
+            value
+            for value in (finite_float_from_csv(row.get("num_peaks")) for row in valid_features)
+            if value is not None
+        ]
+        median_peak = median_or_nan(peak_values)
+        mean_peak = mean_or_nan(peak_values)
+        median_area = median_or_nan(area_values)
+        mean_area = mean_or_nan(area_values)
+        mean_centroid = mean_or_nan(centroid_values)
+        mean_roughness = mean_or_nan(roughness_values)
+        mean_num_peaks = mean_or_nan(num_peak_values)
+        indicator_stats = summarize_indicators(valid_features, valid_only=False)
+        peak_stats = indicator_stats["peak_x_norm"]
+        area_stats = indicator_stats["area_symmetry"]
+        centroid_stats = indicator_stats["centroid_x_norm"]
+        final_verdict, confidence, verdict_reason = decide_video_verdict(
+            valid_ratio=valid_ratio,
+            centered_ratio=centered_ratio,
+            left_ratio=left_ratio,
+            right_ratio=right_ratio,
+            median_peak_x_norm=median_peak,
+            median_area_symmetry=median_area,
+            min_valid_ratio=min_valid_ratio,
+            majority_ratio=majority_ratio,
+            threshold_peak=threshold_peak,
+            threshold_area=threshold_area,
+        )
+
+        rows.append(
+            {
+                "video_name": item["video_name"],
+                "video_id": item["video_id"],
+                "video_path": item["video_path"],
+                "total_frames": total_frames,
+                "analytic_rows": analytic_rows,
+                "valid_frames": valid_frames,
+                "invalid_frames": invalid_frames,
+                "valid_ratio": fmt_float(valid_ratio),
+                "centrado_count": centered_count,
+                "izquierda_count": left_count,
+                "derecha_count": right_count,
+                "no_evaluable_count": no_evaluable_count,
+                "centrado_ratio": fmt_float(centered_ratio),
+                "izquierda_ratio": fmt_float(left_ratio),
+                "derecha_ratio": fmt_float(right_ratio),
+                "p25_peak_x_norm": fmt_float(float(peak_stats["p25"])),
+                "median_peak_x_norm": fmt_float(median_peak),
+                "p75_peak_x_norm": fmt_float(float(peak_stats["p75"])),
+                "mean_peak_x_norm": fmt_float(mean_peak),
+                "p25_area_symmetry": fmt_float(float(area_stats["p25"])),
+                "median_area_symmetry": fmt_float(median_area),
+                "p75_area_symmetry": fmt_float(float(area_stats["p75"])),
+                "mean_area_symmetry": fmt_float(mean_area),
+                "p25_centroid_x_norm": fmt_float(float(centroid_stats["p25"])),
+                "median_centroid_x_norm": fmt_float(float(centroid_stats["median"])),
+                "p75_centroid_x_norm": fmt_float(float(centroid_stats["p75"])),
+                "mean_centroid_x_norm": fmt_float(mean_centroid),
+                "mean_profile_roughness": fmt_float(mean_roughness),
+                "mean_num_peaks": fmt_float(mean_num_peaks),
+                "final_verdict": final_verdict,
+                "confidence": fmt_float(confidence),
+                "verdict_reason": verdict_reason,
+            }
+        )
+
+    return rows
+
+
+def build_indicator_outputs(
+    frame_manifest_rows: list[dict[str, Any]],
+    video_manifest_rows: list[dict[str, Any]],
+    feature_rows: list[dict[str, str]],
+    run_name: str,
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    summary_rows = indicator_summary_rows(
+        feature_rows,
+        scope_type="run",
+        scope_id=run_name,
+        scope_name=run_name,
+    )
+    distribution_rows = indicator_distribution_rows(
+        feature_rows,
+        scope_type="run",
+        scope_id=run_name,
+        scope_name=run_name,
+    )
+
+    frame_to_video = {
+        str(row["frame_name"]): str(row["video_id"]) for row in frame_manifest_rows
+    }
+    features_by_video: dict[str, list[dict[str, str]]] = {}
+    for feature in feature_rows:
+        video_id = frame_to_video.get(str(feature.get("image_name", "")))
+        if video_id is not None:
+            features_by_video.setdefault(video_id, []).append(feature)
+
+    for video in video_manifest_rows:
+        video_id = str(video["video_id"])
+        video_name = str(video["video_name"])
+        rows = features_by_video.get(video_id, [])
+        summary_rows.extend(
+            indicator_summary_rows(
+                rows,
+                scope_type="video",
+                scope_id=video_id,
+                scope_name=video_name,
+            )
+        )
+        distribution_rows.extend(
+            indicator_distribution_rows(
+                rows,
+                scope_type="video",
+                scope_id=video_id,
+                scope_name=video_name,
+            )
+        )
+
+    for row in summary_rows:
+        for field in ("p25", "median", "p75"):
+            row[field] = fmt_float(float(row[field]))
+    for row in distribution_rows:
+        row["bin_start"] = fmt_float(float(row["bin_start"]))
+        row["bin_end"] = fmt_float(float(row["bin_end"]))
+    return summary_rows, distribution_rows
+
+
+def json_safe_indicator_summary(
+    rows: list[dict[str, str]],
+) -> dict[str, dict[str, Any]]:
+    summaries = summarize_indicators(rows)
+    output: dict[str, dict[str, Any]] = {}
+    for indicator, values in summaries.items():
+        output[indicator] = {}
+        for key, value in values.items():
+            if isinstance(value, float) and not math.isfinite(value):
+                output[indicator][key] = None
+            else:
+                output[indicator][key] = value
+    return output
+
+
 def summarize_features(features_csv: Path) -> dict[str, Any]:
     rows = read_csv_rows(features_csv)
     class_counts = Counter(row.get("predicted_class", "") for row in rows)
-    valid_rows = [row for row in rows if row.get("is_valid") == "True"]
+    valid_rows = [row for row in rows if bool_from_csv(row.get("is_valid", ""))]
     invalid_reasons = Counter(
-        row.get("error_reason", "") for row in rows if row.get("is_valid") != "True"
+        row.get("error_reason", "")
+        for row in rows
+        if not bool_from_csv(row.get("is_valid", ""))
     )
     return {
         "rows": len(rows),
@@ -406,6 +864,7 @@ def summarize_features(features_csv: Path) -> dict[str, Any]:
         "invalid": len(rows) - len(valid_rows),
         "predicted_class_counts": dict(class_counts),
         "invalid_reason_counts": dict(invalid_reasons),
+        "indicator_statistics": json_safe_indicator_summary(rows),
     }
 
 
@@ -429,11 +888,23 @@ def main() -> int:
 
     work_base = perception_dir / "model_testing" / "pipeline_runs"
     output_base = ROOT / "outputs" / "pipeline_runs"
+    web_app_base = ROOT / "web_app"
+    web_app_runs_base = web_app_base / "outputs" / "runs"
     work_dir = resolve_repo_path(args.work_dir) if args.work_dir else work_base / run_name
     output_dir = resolve_repo_path(args.output_dir) if args.output_dir else output_base / run_name
 
-    work_dir = prepare_clean_dir(work_dir, work_base, args.overwrite, "work-dir")
-    output_dir = prepare_clean_dir(output_dir, output_base, args.overwrite, "output-dir")
+    work_dir = prepare_clean_dir(
+        work_dir,
+        [work_base, web_app_runs_base],
+        args.overwrite,
+        "work-dir",
+    )
+    output_dir = prepare_clean_dir(
+        output_dir,
+        [output_base, web_app_runs_base],
+        args.overwrite,
+        "output-dir",
+    )
 
     frames_dir = work_dir / "frames"
     masks_dir = work_dir / "yolo_masks"
@@ -484,6 +955,7 @@ def main() -> int:
 
     run_yolo_masks(
         perception_dir=perception_dir,
+        web_app_dir=web_app_base,
         docker_service=args.docker_service,
         yolo_model=yolo_model,
         frames_dir=frames_dir,
@@ -493,6 +965,7 @@ def main() -> int:
         device=args.device,
         mask_mode=args.mask_mode,
         start_docker=args.start_docker,
+        class_id=args.class_id,
     )
 
     copy_if_exists(masks_dir / "manifest.csv", manifests_dir / "yolo_manifest.csv")
@@ -506,6 +979,42 @@ def main() -> int:
     )
 
     features_csv = analytic_dir / "tables" / "features.csv"
+    feature_rows = read_csv_rows(features_csv)
+    analytic_config_data = load_yaml_config(analytic_config)
+    video_summary_rows = build_video_summary(
+        frame_manifest_rows=frame_rows,
+        video_manifest_rows=video_rows,
+        feature_rows=feature_rows,
+        analytic_config=analytic_config_data,
+        min_valid_ratio=max(min(float(args.video_min_valid_ratio), 1.0), 0.0),
+        majority_ratio=max(min(float(args.video_majority_ratio), 1.0), 0.0),
+    )
+    video_summary_csv = output_dir / "video_summary.csv"
+    write_manifest_csv(video_summary_csv, video_summary_rows, VIDEO_SUMMARY_COLUMNS)
+    indicator_summary_rows_data, indicator_distribution_rows_data = build_indicator_outputs(
+        frame_manifest_rows=frame_rows,
+        video_manifest_rows=video_rows,
+        feature_rows=feature_rows,
+        run_name=run_name,
+    )
+    statistics_dir = output_dir / "statistics"
+    indicator_summary_csv = statistics_dir / "indicator_summary.csv"
+    indicator_distributions_csv = statistics_dir / "indicator_distributions.csv"
+    write_manifest_csv(
+        indicator_summary_csv,
+        indicator_summary_rows_data,
+        INDICATOR_SUMMARY_COLUMNS,
+    )
+    write_manifest_csv(
+        indicator_distributions_csv,
+        indicator_distribution_rows_data,
+        INDICATOR_DISTRIBUTION_COLUMNS,
+    )
+    verdict_counts = Counter(row["final_verdict"] for row in video_summary_rows)
+    yolo_summary = load_json_dict(masks_dir / "summary.json")
+    yolo_timings = yolo_summary.get("timings", {})
+    if not isinstance(yolo_timings, dict):
+        yolo_timings = {}
     summary = {
         "run_name": run_name,
         "videos_dir": str(videos_dir),
@@ -520,8 +1029,45 @@ def main() -> int:
         "conf": args.conf,
         "device": args.device,
         "mask_mode": args.mask_mode,
+        "class_id": args.class_id,
         "interval_seconds": max(float(args.interval_seconds), 0.0),
+        "analytic_rules": {
+            "threshold_peak": float(
+                nested_value(analytic_config_data, ("rules", "threshold_peak"), 0.06)
+            ),
+            "threshold_area": float(
+                nested_value(analytic_config_data, ("rules", "threshold_area"), 0.07)
+            ),
+            "peak_vote_weight": float(
+                nested_value(
+                    analytic_config_data,
+                    ("rules", "peak_vote_weight"),
+                    0.5,
+                )
+            ),
+            "area_vote_weight": float(
+                nested_value(
+                    analytic_config_data,
+                    ("rules", "area_vote_weight"),
+                    0.5,
+                )
+            ),
+        },
+        "timings": {
+            "yolo_inference_total_ms": yolo_timings.get("inference_total_ms"),
+            "yolo_inference_mean_ms_per_image": yolo_timings.get(
+                "inference_mean_ms_per_image"
+            ),
+            "yolo_prediction_wall_seconds": yolo_timings.get(
+                "prediction_wall_seconds"
+            ),
+            "yolo_images_per_second": yolo_timings.get("images_per_second"),
+        },
         "features_csv": str(features_csv),
+        "video_summary_csv": str(video_summary_csv),
+        "indicator_summary_csv": str(indicator_summary_csv),
+        "indicator_distributions_csv": str(indicator_distributions_csv),
+        "video_verdict_counts": dict(verdict_counts),
         "feature_summary": summarize_features(features_csv),
     }
     summary_path = output_dir / "pipeline_summary.json"
@@ -532,6 +1078,14 @@ def main() -> int:
     print(f"Frames: {frames_dir}")
     print(f"Mascaras YOLO: {masks_dir}")
     print(f"Resultados analitico: {analytic_dir}")
+    print(f"Veredictos por video: {video_summary_csv}")
+    print(f"Resumen de indicadores: {indicator_summary_csv}")
+    print(f"Distribuciones de indicadores: {indicator_distributions_csv}")
+    if yolo_timings.get("inference_mean_ms_per_image") is not None:
+        print(
+            "Inferencia YOLO: "
+            f"{float(yolo_timings['inference_mean_ms_per_image']):.3f} ms/frame"
+        )
     print(f"Resumen: {summary_path}")
     return 0
 

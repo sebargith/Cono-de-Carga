@@ -214,7 +214,9 @@ Todo queda dentro de `D:\Memoria\Cono\perception`:
 data/raw/        exportaciones CVAT de entrada
 data/yolo/       dataset YOLO generado
 runs/            corridas de train/val/predict
-models/          copia de best.pt y last.pt
+models/primary/  modelo principal usado por el pipeline
+models/alternative/ checkpoint alternativo versionado
+models/<run>/    pesos generados por nuevos entrenamientos
 mlruns/          tracking local de MLflow
 .cache/          cache de Ultralytics/Matplotlib
 ```
@@ -279,12 +281,13 @@ docker compose exec cone-yolo python scripts/prepare_yolo_dataset.py `
   --overwrite
 ```
 
-El modo antiguo sigue disponible para combinar exportaciones y hacer split aleatorio:
+También se pueden pasar una o más exportaciones explícitas y generar un split
+aleatorio:
 
 ```powershell
 docker compose exec cone-yolo python scripts/prepare_yolo_dataset.py `
-  --cvat-dir "data/raw/Data prueba 1" `
-  --cvat-dir "data/raw/Data prueba 2" `
+  --cvat-dir "<ruta_exportacion_cvat_1>" `
+  --cvat-dir "<ruta_exportacion_cvat_2>" `
   --config "configs/perception_config.yaml" `
   --overwrite
 ```
@@ -386,8 +389,8 @@ docker compose exec cone-yolo python scripts/validate_yolo_seg.py `
 
 ```powershell
 docker compose exec cone-yolo python scripts/predict_yolo_seg.py `
-  --model "models/<run_name>/best.pt" `
-  --source "data/raw/Data prueba 1/JPEGImages" `
+  --model "models/primary/psinet_carga_visible.pt" `
+  --source "model_testing/reference/prueba_01/sources" `
   --config "configs/perception_config.yaml" `
   --conf 0.35 `
   --device 0
@@ -405,13 +408,16 @@ Para conectar YOLO-seg con el analitico geometrico, usa el adaptador:
 
 ```powershell
 docker compose exec cone-yolo python scripts/predict_to_analytic_masks.py `
-  --model "models/reference/carga_visible_yolov8n-seg_20260527_195509/best.pt" `
+  --model "models/primary/psinet_carga_visible.pt" `
   --images-dir "model_testing/reference/prueba_01/sources" `
   --masks-dir "model_testing/analytic_masks/prueba_01" `
   --conf 0.35 `
   --device 0 `
   --overwrite
 ```
+
+La configuración selecciona `class_id=1`, correspondiente a `material` en el
+modelo principal PSINet.
 
 Este script guarda una mascara `.png` por frame con el mismo nombre base:
 
@@ -435,7 +441,8 @@ Por defecto, si YOLO detecta mas de una instancia de carga en el frame, se conse
 
 ```powershell
 docker compose exec cone-yolo python scripts/predict_to_analytic_masks.py `
-  --model "models/<run_name>/best.pt" `
+  --model "models/alternative/best.pt" `
+  --class-id 0 `
   --images-dir "<carpeta_de_frames>" `
   --masks-dir "model_testing/analytic_masks/<nombre_prueba>" `
   --mask-mode merge_all `
@@ -461,15 +468,19 @@ D:\Memoria\Cono\outputs\pipeline_yolo_masks_prueba_01\tables\features.csv
 D:\Memoria\Cono\outputs\pipeline_yolo_masks_prueba_01\overlays\
 ```
 
-## 9. Referencias Versionadas
+## 9. Modelos Versionados
 
-El repositorio conserva un unico modelo YOLO-seg como referencia inicial:
+El repositorio conserva dos pesos con funciones distintas:
 
 ```text
-D:\Memoria\Cono\perception\models\reference\carga_visible_yolov8n-seg_20260527_195509\best.pt
+D:\Memoria\Cono\perception\models\primary\psinet_carga_visible.pt
+D:\Memoria\Cono\perception\models\alternative\best.pt
 ```
 
-Tambien incluye un caso de inferencia reproducible con 24 imagenes de entrada y sus 24 resultados:
+El primero es el segmentador operativo y usa la clase `material`
+(`class_id=1`). El segundo es el checkpoint entrenado en este repositorio y usa
+la clase `Carga` (`class_id=0`). También se conserva un caso de inferencia
+reproducible con 24 imágenes de entrada y sus resultados:
 
 ```text
 D:\Memoria\Cono\perception\model_testing\reference\prueba_01\

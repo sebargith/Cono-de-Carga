@@ -51,6 +51,10 @@ augmentation:
   mosaic: 0.5
 
 prediction:
+  model: models/primary/psinet_carga_visible.pt
+  class_id: 1
+  alternative_model: models/alternative/best.pt
+  alternative_class_id: 0
   conf: 0.35
   analytic_masks_dir: model_testing/analytic_masks
   analytic_mask_mode: largest

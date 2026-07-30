@@ -1,115 +1,86 @@
 # Cono de Carga en CAEX
 
-Este proyecto corresponde al desarrollo inicial de un analítico geométrico para el estudio del **cono de carga en camiones de extracción CAEX**, usando visión computacional aplicada a minería.
+Sistema de visión computacional para analizar la **forma visible de la carga**
+en camiones CAEX observados desde atrás. El flujo actual procesa videos locales,
+segmenta automáticamente la carga y clasifica cada frame como `izquierda`,
+`centrado`, `derecha` o `no_evaluable`.
 
-El objetivo es analizar la **forma visible de la carga** en la tolva del camión a partir de frames extraídos desde videos con vista posterior. En esta primera etapa se trabaja con máscaras manuales de la carga etiquetadas en CVAT, sin usar todavía una ROI, máscara de tolva ni modelo de percepción automático.
+Las mediciones son internas a la máscara segmentada. Describen la posición
+relativa del pico, la simetría interna de área y la posición relativa del
+centroide; no representan balance físico, centro de masa real ni distribución
+real del payload.
 
-## Estado actual
-
-Actualmente se está desarrollando un analítico simple que toma como entrada:
-
-- imagen original;
-- máscara manual de carga exportada desde CVAT.
-
-A partir de esa máscara, el sistema calcula características geométricas como:
-
-- bounding box de la carga;
-- centroide;
-- perfil superior;
-- pico principal;
-- simetría interna izquierda/derecha;
-- área izquierda y derecha;
-- clase preliminar del estado de la carga.
-
-La salida principal clasifica cada frame como:
-
-- `centrado`
-- `izquierda`
-- `derecha`
-- `no_evaluable`
-
-Los frames donde la máscara de carga toca cualquier borde de la imagen se descartan del análisis geométrico. Estos casos se conservan en el CSV para mantener trazabilidad, pero quedan marcados como:
+## Pipeline
 
 ```text
-predicted_class = no_evaluable
-is_valid = False
-error_reason = mascara_toca_borde_imagen
+video local
+→ extracción de frames
+→ segmentación de carga con YOLO
+→ máscara RGB compatible con el analítico
+→ analítico geométrico por frame
+→ veredicto y estadísticas por video
+→ CSV, JSON y overlays
 ```
 
-El CSV también indica qué bordes fueron alcanzados:
+El modelo principal es `perception/models/primary/psinet_carga_visible.pt`. La
+carga corresponde a la clase `material` (`class_id=1`). Como alternativa se
+conserva `perception/models/alternative/best.pt`, entrenado en este proyecto y
+con clase `Carga` (`class_id=0`).
+
+## Ejecución desde video
+
+La inferencia de percepción se ejecuta dentro del contenedor Docker:
+
+```powershell
+cd D:\Memoria\Cono\perception
+docker compose up -d
+
+cd D:\Memoria\Cono
+python scripts\run_pipeline_from_videos.py `
+  --videos-dir "data\pipeline_input\videos" `
+  --run-name "prueba_video" `
+  --interval-seconds 0.5 `
+  --device 0 `
+  --overwrite
+```
+
+Los resultados quedan en `outputs/pipeline_runs/<run_name>/`. La guía completa
+está en [docs/pipeline_videos_locales.md](docs/pipeline_videos_locales.md).
+
+## Aplicación web
+
+En Windows se puede iniciar con doble clic en
+`Abrir web app Cono de Carga.bat`. El lanzador crea el entorno local de la
+interfaz cuando no existe. Docker debe estar disponible para la etapa de
+segmentación.
+
+## Analítico con máscaras existentes
+
+También es posible ejecutar solo el analítico con máscaras manuales de CVAT o
+máscaras ya generadas:
+
+```powershell
+python scripts\run_simple_analytic.py `
+  --images-dir "<ruta_a_JPEGImages>" `
+  --masks-dir "<ruta_a_SegmentationClass>" `
+  --output-dir "outputs\analitico_manual" `
+  --config "configs\analytic_config.yaml"
+```
+
+## Estructura
 
 ```text
-touches_left_border
-touches_right_border
-touches_top_border
-touches_bottom_border
-is_truncated_by_frame
+configs/       configuración del analítico
+data/          datos locales y benchmarks no versionados
+deliverables/  informe, presentación y evaluaciones consolidadas
+docs/          arquitectura, uso y contexto técnico
+perception/    preparación, entrenamiento e inferencia YOLO con Docker
+scripts/       orquestadores y evaluaciones
+src/           analítico geométrico
+tools/         utilidades auxiliares y generación de figuras
+web_app/       interfaz Streamlit encapsulada
 ```
 
-El margen de descarte se configura en `configs/analytic_config.yaml`:
-
-```yaml
-geometry:
-  border_touch_margin_px: 0
-```
-
-## Flujo actual
-
-```text
-frames de video
-→ etiquetado manual en CVAT
-→ exportación de máscaras
-→ lectura de imagen y máscara
-→ conversión de máscara a binaria
-→ extracción de features geométricas
-→ clasificación preliminar
-→ generación de CSV y overlays
-```
-
-## Pasos futuros
-
-- Validar el analítico con más frames etiquetados manualmente.
-- Ajustar los umbrales de clasificación en `analytic_config.yaml`.
-- Mejorar la detección de casos `no_evaluable`.
-- Agregar evaluación cuantitativa con etiquetas manuales por frame.
-- Conectar la máscara predicha por el modelo con el mismo analítico geométrico.
-- Comparar resultados usando máscaras manuales vs máscaras automáticas.
-- Evaluar resultados por secuencia de video, no solo por frame.
-
-## Modelo de percepción YOLO-seg
-
-El repositorio incluye un módulo independiente en [`perception/`](perception/) para entrenar, validar y probar un modelo YOLO de segmentación de carga visible.
-
-El flujo implementado es:
-
-```text
-exportaciones CVAT
-→ conversión a dataset YOLO-seg
-→ entrenamiento con GPU mediante Docker
-→ seguimiento experimental en MLflow
-→ validación e inferencia
-→ máscara automática para conectar con el analítico geométrico
-```
-
-Las instrucciones detalladas se encuentran en [`perception/README.md`](perception/README.md).
-
-
-## Uso Básico
-
-```text
-python Memoria/Cono/scripts/run_simple_analytic.py \
-  --images-dir <ruta_a_JPEGImages> \
-  --masks-dir <ruta_a_SegmentationClass> \
-  --output-dir Memoria/Cono/outputs \
-  --config Memoria/Cono/configs/analytic_config.yaml
-```
-
-## Pipeline Desde Videos Locales
-
-Para procesar videos ya descargados en una carpeta local, usar:
-
-```text
-scripts/run_pipeline_from_videos.py
-```
-
-Este flujo extrae frames, genera mascaras automaticas con YOLO-seg y ejecuta el analitico geometrico. La guia esta en [`docs/pipeline_videos_locales.md`](docs/pipeline_videos_locales.md).
+La documentación de entrenamiento está en
+[perception/README.md](perception/README.md), y la organización de modelos en
+[perception/models/README.md](perception/models/README.md).

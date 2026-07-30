@@ -4,6 +4,7 @@ import argparse
 import csv
 import json
 import sys
+import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -310,7 +311,13 @@ def main() -> int:
     class_id = (
         args.class_id
         if args.class_id is not None
-        else int(get_nested(config, ("dataset", "class_id"), 0))
+        else int(
+            get_nested(
+                config,
+                ("prediction", "class_id"),
+                get_nested(config, ("dataset", "class_id"), 0),
+            )
+        )
     )
     conf = args.conf if args.conf is not None else float(get_nested(config, ("prediction", "conf"), 0.35))
     imgsz = args.imgsz or int(get_nested(config, ("training", "imgsz"), 640))
@@ -328,8 +335,15 @@ def main() -> int:
 
     model = YOLO(str(model_path))
     manifest_rows: list[dict[str, Any]] = []
+    speed_totals_ms = {
+        "preprocess": 0.0,
+        "inference": 0.0,
+        "postprocess": 0.0,
+    }
+    speed_samples = 0
 
     processed = 0
+    prediction_started = time.perf_counter()
     for batch in chunked(images, args.batch_size):
         results = model.predict(
             source=[str(path) for path in batch],
@@ -348,6 +362,13 @@ def main() -> int:
             )
 
         for image_path, result in zip(batch, results):
+            result_speed = getattr(result, "speed", {}) or {}
+            for speed_name in speed_totals_ms:
+                speed_value = result_speed.get(speed_name)
+                if speed_value is not None:
+                    speed_totals_ms[speed_name] += float(speed_value)
+            speed_samples += 1
+
             image_path = Path(image_path)
             mask_path = masks_dir / f"{image_path.stem}{output_ext}"
             prediction = result_to_binary_mask(result, class_id=class_id, mask_mode=mask_mode)
@@ -371,6 +392,7 @@ def main() -> int:
 
         print(f"Mascaras generadas {processed}/{len(images)}")
 
+    prediction_wall_seconds = time.perf_counter() - prediction_started
     write_manifest(manifest_path, manifest_rows, overwrite=args.overwrite)
     summary = {
         "images": len(images),
@@ -386,6 +408,28 @@ def main() -> int:
         "imgsz": imgsz,
         "device": device,
         "mask_mode": mask_mode,
+        "timings": {
+            "preprocess_total_ms": round(speed_totals_ms["preprocess"], 3),
+            "preprocess_mean_ms_per_image": round(
+                speed_totals_ms["preprocess"] / speed_samples,
+                3,
+            ),
+            "inference_total_ms": round(speed_totals_ms["inference"], 3),
+            "inference_mean_ms_per_image": round(
+                speed_totals_ms["inference"] / speed_samples,
+                3,
+            ),
+            "postprocess_total_ms": round(speed_totals_ms["postprocess"], 3),
+            "postprocess_mean_ms_per_image": round(
+                speed_totals_ms["postprocess"] / speed_samples,
+                3,
+            ),
+            "prediction_wall_seconds": round(prediction_wall_seconds, 3),
+            "images_per_second": round(
+                len(images) / prediction_wall_seconds,
+                3,
+            ),
+        },
     }
     summary_path = masks_dir / "summary.json"
     if summary_path.exists() and not args.overwrite:

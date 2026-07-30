@@ -1,0 +1,51 @@
+# ========================================
+# FRAME HUNTER - NEXTCLOUD / FRAMES
+# ========================================
+
+nextcloud:
+  url: ""
+  username: ""
+  password: ""
+  remote_folder: "Data-Analitica/ChancadorCMDIC"
+
+# 0 = extrae todos los frames
+# >0 = extrae 1 frame cada N segundos
+extraction:
+  interval_seconds: 2
+  quality: 85
+  use_ffmpeg: true
+  ffmpeg_qscale: 2
+
+specific_videos:
+  - "Camera_8_20240914_142001"
+  - "Camera_8_20240910_114001"
+  - "Camera_8_20240910_111001"
+  - "Camera_8_20240910_103001"
+  - "Camera_8_20240910_094001"
+  - "Camera_8_20240908_125002"
+  - "Camera_8_20240908_123001"
+  - "Camera_8_20240908_104001"
+  - "Camera_8_20240907_160001"
+  - "Camera_8_20240907_135001"
+  - "Camera_8_20240907_103001"
+  - "Camera_8_20240823_115001"
+  - "Camera_8_20240823_113001"
+  - "Camera_8_20240823_105002"
+  - "Camera_8_20240822_114002"
+  - "Camera_8_20240822_103002"
+  - "Camera_8_20240821_110002"
+  - "Camera_8_20240821_100002"
+  - "Camera_8_20240821_090002"
+  - "Camera_8_20240814_113001"
+  - "Camera_8_20240730_113001"
+  - "Camera_8_20240730_110001"
+  - "Camera_8_20240730_104001"
+  - "Camera_8_20240729_115001"
+  - "Camera_8_20240729_110001"
+  - "Camera_8_20240729_101001"
+
+
+
+local_paths:
+  videos_folder: "data/videos"
+  frames_root: "data/frames"
