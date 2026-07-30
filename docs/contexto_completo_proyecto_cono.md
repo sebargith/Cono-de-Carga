@@ -4,7 +4,7 @@
 
 Este archivo reúne el estado técnico, las decisiones, los experimentos, los resultados y las limitaciones conocidas del proyecto **Cono de Carga en CAEX**. Está escrito como documento de transferencia de contexto para que otra IA o persona pueda continuar el trabajo sin depender del historial del chat.
 
-Fecha de consolidación: **2026-07-21**.
+Fecha de consolidación: **2026-07-30**.
 
 Raíz local del proyecto:
 
@@ -18,25 +18,10 @@ Repositorio remoto:
 https://github.com/sebargith/Cono-de-Carga
 ```
 
-La copia usada para sincronizar cambios con Git se encuentra en:
-
-```text
-D:\Memoria\Cono\.repo-sync-cono
-```
-
-Al momento de redactar este documento, la rama con los cambios más recientes de la prueba técnica es:
-
-```text
-feat-prueba-tecnica
-```
-
-Último commit conocido de esa rama:
-
-```text
-55b643b feat: agrega comparaciones visuales por clase
-```
-
-No se debe asumir que todos los cambios de ramas funcionales ya están integrados en `main`. Antes de trabajar sobre Git, revisar ramas, historial y estado de la copia de sincronización.
+`D:\Memoria\Cono` es también la raíz Git. La antigua copia oculta de
+sincronización fue eliminada para evitar dos árboles de trabajo divergentes.
+Antes de modificar el proyecto se debe revisar la rama activa y `git status`
+directamente en esta raíz.
 
 ### 1.1 Instituciones y contexto industrial
 
@@ -58,7 +43,7 @@ Fuentes oficiales:
 
 **PSINet** es la empresa colaboradora y contraparte técnica del proyecto. Su actividad se concentra en soluciones e integraciones tecnológicas para minería. Según su información institucional, el Grupo PSINet opera desde 2001 y trabaja en infraestructura tecnológica, redes industriales, servicios IT y OT, monitoreo, control y analítica, además de telecomunicaciones y automatización minera.
 
-En el proyecto Cono de Carga, PSINet vincula la investigación con la aplicación industrial: está asociada al acceso y contexto de los datos, a modelos de percepción desarrollados previamente y a la orientación práctica de la solución. El modelo denominado `modelo Psinet`, descrito más adelante, es actualmente el que ha obtenido el mejor resultado en la evaluación técnica local.
+En el proyecto Cono de Carga, PSINet vincula la investigación con la aplicación industrial: está asociada al acceso y contexto de los datos, al modelo de percepción principal y a la orientación práctica de la solución. El peso PSINet versionado en `perception/models/primary/` es el segmentador usado por defecto.
 
 Fuente oficial:
 
@@ -117,7 +102,9 @@ video local
 
 También existe una web app local en Streamlit que permite subir videos, ejecutar el pipeline y revisar consola, overlays, estadísticas, veredicto y archivos descargables.
 
-El mejor resultado cuantitativo obtenido hasta ahora corresponde al modelo local llamado **modelo Psinet**, usando su clase `material` y los umbrales analíticos actuales. En una prueba balanceada de 90 imágenes consiguió:
+El mejor resultado cuantitativo obtenido hasta ahora corresponde al modelo
+principal PSINet, usando su clase `material` y los umbrales analíticos actuales.
+En una prueba balanceada de 90 imágenes consiguió:
 
 ```text
 80/90 correctas
@@ -125,7 +112,9 @@ El mejor resultado cuantitativo obtenido hasta ahora corresponde al modelo local
 90/90 imágenes evaluables
 ```
 
-Este resultado todavía no está conectado de forma correcta al pipeline general de videos/web, porque dicho modelo posee dos clases (`caex=0`, `material=1`) y los orquestadores actuales no exponen `class_id`. La prueba correcta se ejecutó seleccionando explícitamente `--class-id 1` en el adaptador YOLO.
+Este modelo ya está conectado al pipeline general y a la aplicación web. La
+configuración selecciona `class_id=1` por defecto; el parámetro también puede
+sobrescribirse desde los orquestadores.
 
 ## 3. Alcance conceptual y terminología
 
@@ -206,7 +195,7 @@ La irregularidad tampoco es una clase final en la versión actual. `profile_roug
 
 - Se creó la evaluación cuantitativa de prueba técnica.
 - Se ajustaron umbrales y pesos del analítico.
-- Se comparó el YOLO original con el modelo Psinet.
+- Se comparó el checkpoint entrenado en el proyecto con el modelo principal PSINet.
 - Se agregaron reportes, matriz de confusión y comparaciones visuales por clase.
 
 ## 5. Estructura relevante
@@ -247,16 +236,19 @@ D:\Memoria\Cono\
     models\
     model_testing\
     mlruns\
-  frame-hunter-nextcloud\
+  tools\
+    frame_hunter_nextcloud\
+    reporting\
   web_app\
     app.py
     src\pipeline_runner.py
     src\run_storage.py
     data\
     outputs\
+  data\
+  deliverables\
+  docs\
   outputs\
-  Data\
-  Documentacion\
   Abrir web app Cono de Carga.bat
 ```
 
@@ -687,10 +679,10 @@ epoch final masks mAP50-95: 0.91647
 
 Estas métricas provienen de un conjunto de validación pequeño de 36 imágenes y no equivalen al desempeño end-to-end de clasificación geométrica en cámaras o fechas distintas.
 
-Modelo de referencia versionado:
+Checkpoint alternativo versionado:
 
 ```text
-perception\models\reference\carga_visible_yolov8n-seg_20260527_195509\best.pt
+perception\models\alternative\best.pt
 ```
 
 SHA256 conocido:
@@ -699,14 +691,16 @@ SHA256 conocido:
 11BF01302CABD3EAE1CFE65FDAD12B08FB1AA750493D976148CEABA9D35E336C
 ```
 
-El mismo `best.pt` aparece copiado en varias carpetas; son duplicados del mismo entrenamiento. `last.pt` es el checkpoint de la última época, no otro experimento.
+Las copias redundantes de este archivo y de `last.pt` fueron eliminadas. Se
+conserva un solo `best.pt` como respaldo y referencia del entrenamiento hecho en
+el repositorio.
 
-### 8.5 Modelo Psinet
+### 8.5 Modelo principal PSINet
 
 Archivo local:
 
 ```text
-perception\models\modelo psinet\haul_truck_segment_m_736_low_data_aug_07012025.pt
+perception\models\primary\psinet_carga_visible.pt
 ```
 
 Tamaño:
@@ -728,11 +722,14 @@ Clases internas:
 1: material
 ```
 
-Para segmentar carga se debe seleccionar:
+Para segmentar carga se selecciona:
 
 ```text
 --class-id 1
 ```
+
+Este valor se encuentra en `prediction.class_id` dentro de
+`perception/configs/perception_config.yaml`.
 
 El archivo Psinet está presente localmente, pero no aparece versionado en la rama `feat-prueba-tecnica` del repositorio remoto.
 
@@ -868,16 +865,13 @@ Lógica:
 
 Se guardan conteos, ratios, medianas, medias, confianza y motivo del veredicto.
 
-### 9.2 Limitación crítica actual para Psinet
+### 9.2 Selección de modelo y clase
 
-El script `predict_to_analytic_masks.py` soporta `--class-id`, pero:
-
-- `run_pipeline_from_videos.py` no expone ni propaga `class_id`;
-- `run_manager_sample_from_images.py` tampoco lo expone;
-- la web app no ofrece selector de clase;
-- `perception_config.yaml` mantiene `dataset.class_id: 0` para el modelo YOLO original.
-
-Por lo tanto, cambiar solo `--yolo-model` al modelo Psinet hace que se segmente `caex`, no `material`. Antes de usar Psinet como modelo general se debe propagar `class_id=1` por pipeline, web y configuración, idealmente junto con validación de nombres de clases.
+El pipeline utiliza `perception/models/primary/psinet_carga_visible.pt` y
+`prediction.class_id: 1` de forma predeterminada. `run_pipeline_from_videos.py`
+y `run_manager_sample_from_images.py` exponen `--class-id` y lo propagan al
+adaptador. El checkpoint `perception/models/alternative/best.pt` sigue
+disponible para comparación, pero debe ejecutarse con `--class-id 0`.
 
 ## 10. Web app local
 
@@ -942,14 +936,15 @@ El lanzador:
 - utiliza un puerto separado para no interferir con la aplicacion de
   Granulometria, que puede estar ejecutandose en `8501`.
 
-Estado importante: la web app usa el modelo por defecto definido en `run_pipeline_from_videos.py`, es decir, el YOLOv8n-seg original. Todavía no permite elegir el modelo Psinet ni su clase `material`.
+La web app usa el modelo principal definido en `run_pipeline_from_videos.py`;
+por tanto, ejecuta PSINet con la clase `material` configurada.
 
 ## 11. Frame Hunter y videos
 
 Directorio:
 
 ```text
-frame-hunter-nextcloud
+tools\frame_hunter_nextcloud
 ```
 
 Puede:
@@ -963,8 +958,8 @@ Puede:
 Salidas:
 
 ```text
-frame-hunter-nextcloud\data\videos
-frame-hunter-nextcloud\data\frames\<video>
+tools\frame_hunter_nextcloud\data\videos
+tools\frame_hunter_nextcloud\data\frames\<video>
 ```
 
 El pipeline operativo actual no descarga desde Nextcloud. Toma videos desde una carpeta local. Frame Hunter se mantiene como herramienta separada para abastecer esa carpeta si se necesita.
@@ -978,7 +973,7 @@ No copiar credenciales reales a documentación ni Git.
 Ruta de entrada:
 
 ```text
-D:\Memoria\Cono\Data\Frames_prueba_tecnica
+D:\Memoria\Cono\data\benchmarks\prueba_tecnica_90
 ```
 
 Estructura:
@@ -1066,14 +1061,14 @@ Derecha: 19/30 = 63,33 %
 
 El aumento de sensibilidad mejoró laterales, pero redujo aciertos en centrado.
 
-### 12.4 Resultado del modelo Psinet
+### 12.4 Resultado del modelo principal
 
 Primero se ejecutó por error con clase `0: caex`. Esa corrida produjo 54 descartes por tocar bordes y solo 5/90 aciertos. No debe usarse como evaluación de carga.
 
 La corrida correcta utilizó:
 
 ```text
-modelo Psinet
+PSINet principal
 class_id = 1 (material)
 conf = 0.35
 mask_mode = largest
@@ -1106,11 +1101,14 @@ Izquierda: 28/30 = 93,33 %
 Derecha: 30/30 = 100,00 %
 ```
 
-El modelo Psinet mejoró 17 imágenes y 18,89 puntos porcentuales respecto de la mejor corrida con el YOLO original.
+El modelo principal mejoró 17 imágenes y 18,89 puntos porcentuales respecto de
+la mejor corrida con el checkpoint que ahora se conserva como alternativa.
 
 ### 12.5 Repetición con indicadores geométricos
 
-El 23 de julio de 2026 se repitió la prueba completa con la misma configuración del modelo Psinet para comprobar la reproducibilidad e incorporar los nuevos indicadores al reporte. La corrida obtuvo nuevamente:
+El 23 de julio de 2026 se repitió la prueba completa con la misma configuración
+del modelo principal para comprobar la reproducibilidad e incorporar los nuevos
+indicadores al reporte. La corrida obtuvo nuevamente:
 
 ```text
 90/90 imágenes con predicción YOLO
@@ -1155,25 +1153,25 @@ La generación completa incluye carga de imágenes, preprocesamiento, inferencia
 La repetición con indicadores quedó en:
 
 ```text
-D:\Memoria\Cono\outputs\prueba_tecnica\prueba_tecnica_psinet_indicadores_20260723
+D:\Memoria\Cono\deliverables\evaluacion_tecnica_90
 ```
 
 Contiene:
 
 ```text
-analytic\
-evaluacion\
-evaluacion\evaluacion_por_imagen.csv
-evaluacion\indicadores_geometricos.csv
-evaluacion\distribuciones_geometricas.csv
-evaluacion\resumen_evaluacion.json
-evaluacion\reporte_prueba_tecnica.png
-evaluacion\por_clase_esperada\Centrado
-evaluacion\por_clase_esperada\Izquierda
-evaluacion\por_clase_esperada\Derecha
+overlays\
+comparaciones\Centrado\
+comparaciones\Izquierda\
+comparaciones\Derecha\
+resumen\evaluacion_por_imagen.csv
+resumen\indicadores_geometricos.csv
+resumen\distribuciones_geometricas.csv
+resumen\resumen_evaluacion.json
+resumen\reporte_prueba_tecnica.png
 ```
 
-Cada carpeta por clase esperada conserva las imágenes y overlays correspondientes. El reporte PNG combina:
+Los overlays se conservan una sola vez y las comparaciones se separan por clase
+esperada. El reporte PNG combina:
 
 - resumen global y exactitud por clase;
 - matriz de confusión;
@@ -1284,11 +1282,11 @@ docker compose exec cone-yolo python scripts/train_yolo_seg.py `
   --device 0
 ```
 
-### 15.4 Adaptar un modelo multiclase Psinet
+### 15.4 Ejecutar directamente el modelo principal
 
 ```powershell
 docker compose exec -T cone-yolo python scripts/predict_to_analytic_masks.py `
-  --model "/workspace/models/modelo psinet/haul_truck_segment_m_736_low_data_aug_07012025.pt" `
+  --model "/workspace/models/primary/psinet_carga_visible.pt" `
   --images-dir "/workspace/<imagenes>" `
   --masks-dir "/workspace/<salida_mascaras>" `
   --class-id 1 `
@@ -1362,13 +1360,12 @@ No existe actualmente una suite propia formal de tests unitarios o de integraci�
 - Máscara principal: `largest`.
 - Descarte si toca cualquier borde.
 - Mediciones relativas a la máscara de carga.
-- Mejor modelo probado: Psinet con clase `material=1`.
+- Modelo principal: PSINet con clase `material=1`.
+- Modelo alternativo: `models/alternative/best.pt` con clase `Carga=0`.
 - Mejor resultado técnico: 88,89 % en 90 imágenes.
 
 ### No se considera resuelto
 
-- Integración del modelo Psinet en pipeline/web.
-- Selección configurable de `class_id` en todos los orquestadores.
 - Detección o segmentación de tolva.
 - Control de calidad automático de máscaras incompletas.
 - Empate entre pico y área sin sesgo.
@@ -1381,11 +1378,9 @@ No existe actualmente una suite propia formal de tests unitarios o de integraci�
 
 Prioridad 1:
 
-1. Agregar `--class-id` a `run_pipeline_from_videos.py`.
-2. Propagarlo a `run_yolo_masks`, `run_manager_sample_from_images.py` y web app.
-3. Permitir elegir modelo y clase en la web o definirlos en una configuración única.
-4. Cambiar el modelo por defecto a Psinet solo después de esa integración.
-5. Repetir la prueba técnica desde el pipeline completo, sin pasos manuales.
+1. Repetir la prueba técnica desde el pipeline completo después de cambios de percepción.
+2. Agregar validación automática de los nombres de clases del modelo.
+3. Controlar máscaras incompletas que no alcanzan el borde de imagen.
 
 Prioridad 2:
 
@@ -1408,7 +1403,8 @@ Prioridad 3:
 - No interpretar bbox o centroide como información física del camión.
 - No asumir que un bbox incompleto es un error del bbox: primero revisar la máscara YOLO.
 - No usar `merge_all` indiscriminadamente sin ROI de tolva.
-- No ejecutar el modelo Psinet con `class_id=0` para carga; eso selecciona `caex`.
+- No ejecutar el modelo principal con `class_id=0` para carga; eso selecciona `caex`.
+- No ejecutar el checkpoint alternativo con `class_id=1`; su carga es la clase 0.
 - No comparar la corrida errónea de clase `caex` con los resultados válidos.
 - No asumir que mAP de segmentación implica la misma exactitud del analítico.
 - No asumir que los paths guardados en CSV siguen válidos después de mover outputs.
@@ -1438,10 +1434,18 @@ Prioridad 3:
 | `perception/docker-compose.yml` | Contenedor GPU y montajes. |
 | `web_app/app.py` | Interfaz Streamlit. |
 | `web_app/src/pipeline_runner.py` | Ejecución y streaming de consola. |
-| `frame-hunter-nextcloud/main.py` | Descarga y extracción desde Nextcloud. |
+| `tools/frame_hunter_nextcloud/main.py` | Descarga y extracción desde Nextcloud. |
+| `tools/reporting/generate_report_figures.py` | Regeneración de figuras del informe. |
 
 ## 21. Conclusión técnica
 
-El proyecto ya dispone de un pipeline funcional de extremo a extremo y de una validación cuantitativa inicial. La geometría es simple, interpretable y trazable, pero depende directamente de la calidad de segmentación y de referencias internas a la máscara. El salto de 70,0 % con el YOLO original a 88,89 % con Psinet confirma que la percepción es actualmente el factor más determinante.
+El proyecto ya dispone de un pipeline funcional de extremo a extremo y de una
+validación cuantitativa inicial. La geometría es simple, interpretable y
+trazable, pero depende directamente de la calidad de segmentación y de
+referencias internas a la máscara. El salto de 70,0 % con el checkpoint
+alternativo a 88,89 % con el modelo principal confirma que la percepción es
+actualmente el factor más determinante.
 
-El siguiente cambio de mayor valor no es bajar más los umbrales, sino integrar correctamente el modelo Psinet multiclase en todos los orquestadores y repetir evaluaciones reproducibles. En paralelo, debe corregirse el desempate sesgado y agregarse cobertura automatizada de pruebas.
+Los cambios de mayor valor son fortalecer el control de calidad de máscaras,
+resolver explícitamente los casos geométricos ambiguos y ampliar la validación a
+secuencias, cámaras y condiciones independientes.

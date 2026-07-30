@@ -1,0 +1,46 @@
+flowchart TD
+    A[Imagen original<br/>JPEGImages/] --> C[Entrada del analítico]
+    B[Máscara de carga<br/>SegmentationClass/] --> C
+
+    C --> D[Conversión de máscara<br/>RGB Carga: 102,255,102<br/>a máscara binaria]
+
+    D --> E[Limpieza de máscara]
+    E --> E1[Eliminar ruido]
+    E --> E2[Quedarse con componente principal]
+    E --> E3[Aplicar morfología si corresponde]
+
+    E --> F[Bounding box de la carga]
+    F --> F1[Calcular ancho y alto]
+    F --> F2[Definir centro relativo de la carga]
+
+    F --> G[Centroide de la carga]
+    G --> G1[centroid_x_norm]
+
+    F --> H[Extracción del perfil superior]
+    H --> H1[Buscar primer píxel de carga<br/>de arriba hacia abajo por columna]
+    H1 --> H2[Suavizar perfil]
+
+    H2 --> I[Detección del pico principal]
+    I --> I1[peak_x]
+    I --> I2[peak_y]
+    I --> I3[peak_x_norm]
+
+    F --> J[Simetría de área]
+    J --> J1[Dividir carga en izquierda/derecha<br/>según centro del bounding box]
+    J1 --> J2[area_left]
+    J1 --> J3[area_right]
+    J2 --> J4[area_symmetry]
+    J3 --> J4
+
+    G1 --> K[Reglas de clasificación]
+    I3 --> K
+    J4 --> K
+
+    K --> L{Resultado}
+    L --> M[centrado]
+    L --> N[corrido_izquierda]
+    L --> O[corrido_derecha]
+    L --> P[no_evaluable]
+
+    K --> Q[CSV de features<br/>features.csv]
+    K --> R[Overlays visuales<br/>imagen + máscara + bbox + pico + clase]

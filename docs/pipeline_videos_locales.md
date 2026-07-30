@@ -50,7 +50,7 @@ cd D:\Memoria\Cono
 python scripts/run_pipeline_from_videos.py `
   --videos-dir "data\pipeline_input\videos" `
   --run-name "prueba_videos_01" `
-  --yolo-model "perception\models\reference\carga_visible_yolov8n-seg_20260527_195509\best.pt" `
+  --yolo-model "perception\models\primary\psinet_carga_visible.pt" `
   --interval-seconds 2 `
   --conf 0.35 `
   --device 0 `
@@ -94,6 +94,18 @@ D:\Memoria\Cono\outputs\pipeline_runs\prueba_videos_01\
     indicator_distributions.csv
   video_summary.csv
   pipeline_summary.json
+```
+
+El modelo principal usa la clase `material` (`class_id=1`), seleccionada por
+la configuración. Para probar el checkpoint alternativo:
+
+```powershell
+python scripts\run_pipeline_from_videos.py `
+  --videos-dir "data\pipeline_input\videos" `
+  --run-name "prueba_modelo_alternativo" `
+  --yolo-model "perception\models\alternative\best.pt" `
+  --class-id 0 `
+  --overwrite
 ```
 
 ## Veredicto Por Video

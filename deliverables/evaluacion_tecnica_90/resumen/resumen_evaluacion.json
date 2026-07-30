@@ -1,0 +1,163 @@
+{
+  "total": 90,
+  "evaluable": 90,
+  "no_evaluable": 0,
+  "correct": 80,
+  "accuracy_total": 0.8888888888888888,
+  "accuracy_evaluable": 0.8888888888888888,
+  "evaluable_ratio": 1.0,
+  "confusion_matrix": {
+    "centrado": {
+      "centrado": 22,
+      "izquierda": 6,
+      "derecha": 2,
+      "no_evaluable": 0
+    },
+    "izquierda": {
+      "centrado": 2,
+      "izquierda": 28,
+      "derecha": 0,
+      "no_evaluable": 0
+    },
+    "derecha": {
+      "centrado": 0,
+      "izquierda": 0,
+      "derecha": 30,
+      "no_evaluable": 0
+    }
+  },
+  "per_class": {
+    "centrado": {
+      "total": 30,
+      "evaluable": 30,
+      "correct": 22,
+      "accuracy_total": 0.7333333333333333,
+      "accuracy_evaluable": 0.7333333333333333,
+      "indicator_statistics": {
+        "peak_x_norm": {
+          "label": "Posicion relativa del pico",
+          "count": 30,
+          "p25": -0.02017151617745696,
+          "median": -0.00432990592503577,
+          "p75": 0.02505594027381571
+        },
+        "area_symmetry": {
+          "label": "Simetria interna de area",
+          "count": 30,
+          "p25": -0.0371448255029472,
+          "median": 0.024035529300424303,
+          "p75": 0.03444014597828793
+        },
+        "centroid_x_norm": {
+          "label": "Posicion relativa del centroide",
+          "count": 30,
+          "p25": -0.011256721420167062,
+          "median": 0.006635152891956053,
+          "p75": 0.010713717480600902
+        }
+      }
+    },
+    "izquierda": {
+      "total": 30,
+      "evaluable": 30,
+      "correct": 28,
+      "accuracy_total": 0.9333333333333333,
+      "accuracy_evaluable": 0.9333333333333333,
+      "indicator_statistics": {
+        "peak_x_norm": {
+          "label": "Posicion relativa del pico",
+          "count": 30,
+          "p25": -0.16340815008924842,
+          "median": -0.13784372810870316,
+          "p75": -0.09461137101813594
+        },
+        "area_symmetry": {
+          "label": "Simetria interna de area",
+          "count": 30,
+          "p25": -0.21578078623159527,
+          "median": -0.17886517429783244,
+          "p75": -0.11841515796031664
+        },
+        "centroid_x_norm": {
+          "label": "Posicion relativa del centroide",
+          "count": 30,
+          "p25": -0.06362675424754895,
+          "median": -0.05114992275690944,
+          "p75": -0.03288915205305674
+        }
+      }
+    },
+    "derecha": {
+      "total": 30,
+      "evaluable": 30,
+      "correct": 30,
+      "accuracy_total": 1.0,
+      "accuracy_evaluable": 1.0,
+      "indicator_statistics": {
+        "peak_x_norm": {
+          "label": "Posicion relativa del pico",
+          "count": 30,
+          "p25": 0.08701224622015029,
+          "median": 0.10909886264216972,
+          "p75": 0.14284329940842813
+        },
+        "area_symmetry": {
+          "label": "Simetria interna de area",
+          "count": 30,
+          "p25": 0.14632062993348835,
+          "median": 0.1724668887771191,
+          "p75": 0.19207948697603483
+        },
+        "centroid_x_norm": {
+          "label": "Posicion relativa del centroide",
+          "count": 30,
+          "p25": 0.038092719809996,
+          "median": 0.05009898030787656,
+          "p75": 0.05739209366772225
+        }
+      }
+    }
+  },
+  "prediction_counts": {
+    "centrado": 24,
+    "izquierda": 34,
+    "derecha": 32
+  },
+  "indicator_statistics": {
+    "peak_x_norm": {
+      "label": "Posicion relativa del pico",
+      "count": 90,
+      "p25": -0.09492856582802102,
+      "median": -0.00289014231207081,
+      "p75": 0.08490950536331307
+    },
+    "area_symmetry": {
+      "label": "Simetria interna de area",
+      "count": 90,
+      "p25": -0.11553517386374967,
+      "median": 0.024035529300424303,
+      "p75": 0.1422905886873476
+    },
+    "centroid_x_norm": {
+      "label": "Posicion relativa del centroide",
+      "count": 90,
+      "p25": -0.03190034677212366,
+      "median": 0.006635152891956053,
+      "p75": 0.03621723651257409
+    }
+  },
+  "thresholds": {
+    "peak": 0.06,
+    "area": 0.07
+  },
+  "timings": {
+    "preprocess_total_ms": 223.534,
+    "preprocess_mean_ms_per_image": 2.484,
+    "inference_total_ms": 1672.857,
+    "inference_mean_ms_per_image": 18.587,
+    "postprocess_total_ms": 724.252,
+    "postprocess_mean_ms_per_image": 8.047,
+    "prediction_wall_seconds": 20.232,
+    "images_per_second": 4.448
+  }
+}

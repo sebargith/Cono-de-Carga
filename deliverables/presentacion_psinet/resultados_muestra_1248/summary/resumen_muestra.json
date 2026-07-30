@@ -1,0 +1,43 @@
+﻿{
+    "total_images":  1248,
+    "valid_images":  1183,
+    "invalid_images":  65,
+    "valid_ratio":  "0.947917",
+    "class_counts":  {
+                         "izquierda":  177,
+                         "centrado":  889,
+                         "derecha":  117,
+                         "no_evaluable":  65
+                     },
+    "class_ratios":  {
+                         "izquierda":  "0.141827",
+                         "centrado":  "0.712340",
+                         "derecha":  "0.093750",
+                         "no_evaluable":  "0.052083"
+                     },
+    "invalid_reason_counts":  {
+                                  "mascara_vacia":  42,
+                                  "mascara_toca_borde_imagen":  23
+                              },
+    "settings":  {
+                     "conf":  0.35,
+                     "imgsz":  null,
+                     "device":  "0",
+                     "mask_mode":  "largest"
+                 },
+    "paths":  {
+                  "input_images_dir":  "D:\\Memoria\\Cono\\data\\benchmarks\\muestra_1248",
+                  "work_dir":  null,
+                  "staged_images_dir":  null,
+                  "yolo_masks_dir":  null,
+                  "analytic_dir":  "D:\\Memoria\\Cono\\deliverables\\presentacion_psinet\\resultados_muestra_1248\\tables",
+                  "features_csv":  "D:\\Memoria\\Cono\\deliverables\\presentacion_psinet\\resultados_muestra_1248\\tables\\features.csv",
+                  "features_with_originals_csv":  "D:\\Memoria\\Cono\\deliverables\\presentacion_psinet\\resultados_muestra_1248\\tables\\features_with_originals.csv",
+                  "class_counts_csv":  "D:\\Memoria\\Cono\\deliverables\\presentacion_psinet\\resultados_muestra_1248\\summary\\conteo_resultados.csv",
+                  "separated_dir":  null,
+                  "histogram_results":  "D:\\Memoria\\Cono\\deliverables\\presentacion_psinet\\resultados_muestra_1248\\summary\\histograma_resultados.png",
+                  "histogram_peak_x_norm":  "D:\\Memoria\\Cono\\deliverables\\presentacion_psinet\\resultados_muestra_1248\\summary\\histograma_peak_x_norm.png",
+                  "histogram_area_symmetry":  "D:\\Memoria\\Cono\\deliverables\\presentacion_psinet\\resultados_muestra_1248\\summary\\histograma_area_symmetry.png"
+              },
+    "artifacts_compacted":  true
+}

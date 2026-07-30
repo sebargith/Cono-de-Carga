@@ -1,0 +1,13 @@
+scope_type,scope_id,scope_name,indicator,indicator_label,count,p25,median,p75
+prueba_tecnica,total,Total,peak_x_norm,Posicion relativa del pico,90,-0.09492856582802102,-0.00289014231207081,0.08490950536331307
+prueba_tecnica,total,Total,area_symmetry,Simetria interna de area,90,-0.11553517386374967,0.024035529300424303,0.1422905886873476
+prueba_tecnica,total,Total,centroid_x_norm,Posicion relativa del centroide,90,-0.03190034677212366,0.006635152891956053,0.03621723651257409
+clase_esperada,centrado,Centrado,peak_x_norm,Posicion relativa del pico,30,-0.02017151617745696,-0.00432990592503577,0.02505594027381571
+clase_esperada,centrado,Centrado,area_symmetry,Simetria interna de area,30,-0.0371448255029472,0.024035529300424303,0.03444014597828793
+clase_esperada,centrado,Centrado,centroid_x_norm,Posicion relativa del centroide,30,-0.011256721420167062,0.006635152891956053,0.010713717480600902
+clase_esperada,izquierda,Izquierda,peak_x_norm,Posicion relativa del pico,30,-0.16340815008924842,-0.13784372810870316,-0.09461137101813594
+clase_esperada,izquierda,Izquierda,area_symmetry,Simetria interna de area,30,-0.21578078623159527,-0.17886517429783244,-0.11841515796031664
+clase_esperada,izquierda,Izquierda,centroid_x_norm,Posicion relativa del centroide,30,-0.06362675424754895,-0.05114992275690944,-0.03288915205305674
+clase_esperada,derecha,Derecha,peak_x_norm,Posicion relativa del pico,30,0.08701224622015029,0.10909886264216972,0.14284329940842813
+clase_esperada,derecha,Derecha,area_symmetry,Simetria interna de area,30,0.14632062993348835,0.1724668887771191,0.19207948697603483
+clase_esperada,derecha,Derecha,centroid_x_norm,Posicion relativa del centroide,30,0.038092719809996,0.05009898030787656,0.05739209366772225
