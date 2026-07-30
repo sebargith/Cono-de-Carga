@@ -28,8 +28,7 @@ from cone_load.statistics import (  # noqa: E402
 )
 
 DEFAULT_MODEL = (
-    "perception/models/reference/"
-    "carga_visible_yolov8n-seg_20260527_195509/best.pt"
+    "perception/models/primary/psinet_carga_visible.pt"
 )
 VIDEO_EXTENSIONS = (".mp4", ".avi", ".mov", ".mkv", ".m4v")
 CLASS_CENTERED = "centrado"

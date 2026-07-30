@@ -61,7 +61,7 @@ def write_image(path: Path, image: np.ndarray) -> None:
 
 
 def parse_args() -> argparse.Namespace:
-    default_images = ROOT / "Presentación Psinet" / "data"
+    default_images = ROOT / "data" / "benchmarks" / "muestra_1248"
     parser = argparse.ArgumentParser(
         description=(
             "Corre YOLO + analitico sobre una muestra de imagenes sueltas, "
@@ -71,7 +71,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--images-dir",
         default=str(default_images),
-        help="Carpeta con imagenes de entrada. Por defecto usa Presentacion Psinet/data.",
+        help="Carpeta con imagenes. Por defecto usa data/benchmarks/muestra_1248.",
     )
     parser.add_argument(
         "--run-name",
@@ -91,7 +91,7 @@ def parse_args() -> argparse.Namespace:
         default=None,
         help=(
             "Carpeta final de resultados. Por defecto queda en "
-            "Presentacion Psinet/resultados_muestra/<run-name>."
+            "outputs/muestra_1248/<run-name>."
         ),
     )
     parser.add_argument(
@@ -530,7 +530,7 @@ def main() -> int:
     yolo_model = require_file(perception_host_path(args.yolo_model, perception_dir), "yolo-model")
 
     work_base = perception_dir / "model_testing" / "presentation_sample_runs"
-    output_base = ROOT / "Presentación Psinet" / "resultados_muestra"
+    output_base = ROOT / "outputs" / "muestra_1248"
     work_dir = resolve_repo_path(args.work_dir) if args.work_dir else work_base / run_name
     output_dir = resolve_repo_path(args.output_dir) if args.output_dir else output_base / run_name
 

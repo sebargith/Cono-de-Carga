@@ -311,7 +311,13 @@ def main() -> int:
     class_id = (
         args.class_id
         if args.class_id is not None
-        else int(get_nested(config, ("dataset", "class_id"), 0))
+        else int(
+            get_nested(
+                config,
+                ("prediction", "class_id"),
+                get_nested(config, ("dataset", "class_id"), 0),
+            )
+        )
     )
     conf = args.conf if args.conf is not None else float(get_nested(config, ("prediction", "conf"), 0.35))
     imgsz = args.imgsz or int(get_nested(config, ("training", "imgsz"), 640))

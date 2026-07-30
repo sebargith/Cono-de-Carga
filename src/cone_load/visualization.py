@@ -10,6 +10,15 @@ from cone_load.features import AnalyticResult
 from cone_load.io import ensure_dir, get_config_value
 
 
+def _write_image(path: Path, image: np.ndarray) -> bool:
+    extension = path.suffix or ".jpg"
+    ok, encoded = cv2.imencode(extension, image)
+    if not ok:
+        return False
+    encoded.tofile(str(path))
+    return True
+
+
 def _finite_number(value: Any) -> bool:
     try:
         return bool(np.isfinite(float(value)))
@@ -130,8 +139,7 @@ def render_overlay(
 
     out_path = Path(output_path)
     ensure_dir(out_path.parent)
-    ok = cv2.imwrite(str(out_path), canvas)
+    ok = _write_image(out_path, canvas)
     if not ok:
         raise ValueError(f"No se pudo guardar overlay: {out_path}")
     return out_path
-

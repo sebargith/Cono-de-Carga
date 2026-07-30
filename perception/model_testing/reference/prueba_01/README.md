@@ -3,7 +3,7 @@
 Este snapshot conserva una prueba de inferencia ejecutada con:
 
 ```text
-models/reference/carga_visible_yolov8n-seg_20260527_195509/best.pt
+models/alternative/best.pt
 ```
 
 Contenido:
@@ -19,7 +19,8 @@ Para repetir la inferencia sobre las entradas versionadas:
 
 ```powershell
 docker compose exec cone-yolo python scripts/predict_yolo_seg.py `
-  --model models/reference/carga_visible_yolov8n-seg_20260527_195509/best.pt `
+  --model models/alternative/best.pt `
+  --class-id 0 `
   --source model_testing/reference/prueba_01/sources `
   --project model_testing/outputs `
   --name prueba_01_repetida `
