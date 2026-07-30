@@ -25,6 +25,25 @@ TRAINING_FIGURE = (
 
 
 PARAGRAPH_REPLACEMENTS = {
+    "UNIVERSIDAD DE CONCEPCIÓN\nFACULTAD DE INGENIERÍA": (
+        "UNIVERSIDAD DE CONCEPCIÓN\n"
+        "FACULTAD DE INGENIERÍA\n"
+        "DEPARTAMENTO DE INGENIERÍA INFORMÁTICA Y CS. DE LA COMPUTACIÓN\n"
+        "CARRERA DE INGENIERÍA CIVIL INFORMÁTICA\n"
+    ),
+    "La Memoria se desarrolla en la Facultad de Ingeniería": (
+        "La Memoria se desarrolla en la carrera de Ingeniería Civil Informática "
+        "de la Facultad de Ingeniería de la Universidad de Concepción, "
+        "institución académica responsable de la formación y evaluación del "
+        "trabajo. PSINet participa como contraparte técnica a través de su "
+        "departamento de I+D y vincula el desarrollo con una aplicación "
+        "industrial de visión computacional en minería. Los registros utilizados "
+        "provienen de la operación de Compañía Minera Doña Inés de Collahuasi, "
+        "ubicada en la Región de Tarapacá. Collahuasi se considera origen de los "
+        "datos y no institución colaboradora formal de la Memoria. El permiso y "
+        "la realización del trabajo fueron consultados mediante PSINet en "
+        "reuniones con gerencias de ambas organizaciones [15]-[17]."
+    ),
     "La implementación integra Python, OpenCV": (
         "La implementación integra Python, OpenCV, NumPy, SciPy, Pandas, "
         "Ultralytics, Docker, NVIDIA CUDA, MLflow y Streamlit. El repositorio "
@@ -99,6 +118,24 @@ PARAGRAPH_REPLACEMENTS = {
         "principal de percepción y no intenta reconstruir regiones omitidas ni "
         "corregir contornos erróneos."
     ),
+    "La evaluación se organiza en tres niveles.||La evaluación considera tres niveles:": (
+        "La evaluación considera tres niveles: métricas internas del "
+        "entrenamiento; una prueba técnica balanceada de 90 imágenes, con 30 "
+        "casos visuales por clase, para medir la clasificación de extremo a "
+        "extremo; y una muestra de 1.248 imágenes para estudiar el "
+        "comportamiento operacional, los descartes y la distribución de salidas "
+        "en una cantidad mayor de escenarios."
+    ),
+    "Las etiquetas esperadas de la prueba técnica||Las 90 imágenes proceden": (
+        "Las 90 imágenes proceden del banco de evidencias CAEX del proyecto de "
+        "Granulometría (data/raw/evidencias_caex/images), una base distinta del "
+        "entrenamiento y formada por registros de fechas posteriores. Se "
+        "seleccionaron visualmente 30 casos centrados, 30 a izquierda y 30 a "
+        "derecha. Las etiquetas representan apariencia visual, no mediciones "
+        "físicas. La separación temporal reduce el riesgo de reutilizar imágenes "
+        "de entrenamiento, aunque el tamaño y la selección dirigida mantienen el "
+        "resultado como validación técnica local."
+    ),
     "El modelo de percepción entrenado se evalúa junto": (
         "El modelo principal PSINet se evalúa junto con el analítico sobre las "
         "90 imágenes de la prueba técnica. Todas resultan evaluables y 80 se "
@@ -109,6 +146,26 @@ PARAGRAPH_REPLACEMENTS = {
     "Fuente: elaboración propia a partir de la prueba técnica": (
         "Fuente: elaboración propia a partir de la prueba técnica balanceada de "
         "90 imágenes procesada con el modelo principal de percepción."
+    ),
+    "La muestra operacional se procesa con confianza 0,35": (
+        "Las 1.248 imágenes también proceden del banco de evidencias CAEX del "
+        "proyecto de Granulometría (data/raw/evidencias_caex/images). Se "
+        "seleccionaron para observar el comportamiento del pipeline sobre un "
+        "volumen mayor y obtener una referencia descriptiva de cómo se "
+        "distribuyen las cargas en diversos escenarios. La muestra se procesa "
+        "con confianza 0,35 y selección de la instancia de mayor área. Se "
+        "obtienen 1.183 imágenes válidas y 65 no evaluables. De estas últimas, "
+        "42 corresponden a máscaras vacías y 23 a máscaras que tocan algún "
+        "borde de la imagen. El descarte por borde evita que una carga "
+        "incompleta genere picos falsos o una simetría artificial."
+    ),
+    "La predominancia de centrado describe": (
+        "La predominancia de centrado describe las salidas del sistema sobre "
+        "esta muestra amplia y permite observar su distribución en distintos "
+        "escenarios. No constituye una medición de exactitud ni, por sí sola, "
+        "una evaluación de la calidad del carguío, porque las 1.248 imágenes no "
+        "poseen una etiqueta esperada independiente para cada caso y pueden "
+        "contener múltiples fotogramas del mismo evento."
     ),
     "Tabla C.9. Métricas por clase del modelo de percepción.": (
         "Tabla C.9. Métricas de clasificación por clase."
@@ -121,6 +178,14 @@ PARAGRAPH_REPLACEMENTS = {
         "de errores muestra que la percepción sigue siendo un factor limitante, "
         "pues las reglas geométricas no recuperan regiones omitidas ni remueven "
         "regiones incorrectas sin información adicional."
+    ),
+    "La prueba técnica tiene 90 imágenes seleccionadas": (
+        "La prueba técnica se limita a 90 imágenes seleccionadas visualmente. "
+        "Aunque proceden de una base distinta y de fechas posteriores al "
+        "conjunto usado para entrenar el segmentador, su tamaño y selección "
+        "balanceada no reemplazan una evaluación prospectiva por secuencias "
+        "completas, eventos independientes y condiciones operacionales más "
+        "diversas."
     ),
     "El repositorio mantiene configuración y código": (
         "El repositorio mantiene configuración y código separados de datos y "
@@ -142,7 +207,17 @@ PARAGRAPH_REPLACEMENTS = {
         "alternativo, y registrar junto a cada corrida la ruta del peso, la "
         "clase seleccionada, el umbral de confianza y el conjunto de evaluación."
     ),
+    "ANEXO B. OBSERVACIONES EDITORIALES PARA LA INTEGRACIÓN": (
+        "ANEXO B. PENDIENTES EDITORIALES PARA LA INTEGRACIÓN"
+    ),
 }
+
+
+APPENDIX_PENDING_ITEMS = (
+    "Definir el título definitivo de la Memoria y reemplazar el título provisional de la portada.",
+    "Ajustar la numeración final de capítulos, tablas, figuras y anexos al fusionar esta parte con Granulometría; el prefijo C se mantiene provisionalmente.",
+    "Actualizar las fechas de consulta de las referencias y aplicar el estilo bibliográfico exigido por la carrera al cerrar el documento completo.",
+)
 
 
 def replace_paragraph_text(paragraph, replacement: str) -> None:
@@ -154,16 +229,40 @@ def replace_paragraph_text(paragraph, replacement: str) -> None:
         paragraph.add_run(replacement)
 
 
+def remove_paragraph(paragraph) -> None:
+    element = paragraph._element
+    element.getparent().remove(element)
+    paragraph._p = paragraph._element = None
+
+
+def update_appendix(document: Document) -> None:
+    paragraphs = document.paragraphs
+    heading_index = next(
+        i
+        for i, paragraph in enumerate(paragraphs)
+        if paragraph.text == "ANEXO B. PENDIENTES EDITORIALES PARA LA INTEGRACIÓN"
+    )
+    item_paragraphs = paragraphs[heading_index + 2 :]
+    if len(item_paragraphs) < len(APPENDIX_PENDING_ITEMS):
+        raise RuntimeError("El Anexo B no contiene suficientes párrafos editables.")
+
+    for paragraph, text in zip(item_paragraphs, APPENDIX_PENDING_ITEMS):
+        replace_paragraph_text(paragraph, text)
+    for paragraph in item_paragraphs[len(APPENDIX_PENDING_ITEMS) :]:
+        remove_paragraph(paragraph)
+
+
 def update_text(document: Document) -> None:
     found = set()
-    for prefix, replacement in PARAGRAPH_REPLACEMENTS.items():
+    for prefix_group, replacement in PARAGRAPH_REPLACEMENTS.items():
+        prefixes = prefix_group.split("||")
         for paragraph in document.paragraphs:
-            if paragraph.text.startswith(prefix):
+            if any(paragraph.text.startswith(prefix) for prefix in prefixes):
                 replace_paragraph_text(paragraph, replacement)
-                found.add(prefix)
+                found.add(prefix_group)
                 break
             if paragraph.text == replacement:
-                found.add(prefix)
+                found.add(prefix_group)
                 break
 
     missing = set(PARAGRAPH_REPLACEMENTS) - found
@@ -176,6 +275,7 @@ def update_text(document: Document) -> None:
     training_table = document.tables[4]
     training_table.cell(1, 1).text = "yolov8n-seg (alternativo)"
     training_table.cell(1, 2).text = "Checkpoint reproducible conservado como respaldo."
+    update_appendix(document)
 
 
 def replace_embedded_figure(docx_path: Path, figure_path: Path) -> None:
