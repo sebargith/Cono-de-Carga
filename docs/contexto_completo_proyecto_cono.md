@@ -116,6 +116,12 @@ Este modelo ya está conectado al pipeline general y a la aplicación web. La
 configuración selecciona `class_id=1` por defecto; el parámetro también puede
 sobrescribirse desde los orquestadores.
 
+La etapa de percepción no es exclusiva de Cono. El checkpoint principal es el
+mismo archivo binario utilizado por Granulometría para aislar la superficie
+visible del material. Ambos subproyectos comparten, por tanto, el modelo y la
+semántica de la clase `material`, pero aplican adaptadores y postprocesamientos
+distintos antes de ejecutar sus analíticos específicos.
+
 ## 3. Alcance conceptual y terminología
 
 ### 3.1 Qué se mide
@@ -197,6 +203,20 @@ La irregularidad tampoco es una clase final en la versión actual. `profile_roug
 - Se ajustaron umbrales y pesos del analítico.
 - Se comparó el checkpoint entrenado en el proyecto con el modelo principal PSINet.
 - Se agregaron reportes, matriz de confusión y comparaciones visuales por clase.
+
+### 23 de julio de 2026
+
+- Se repitió la prueba técnica de 90 imágenes con el modelo principal.
+- Se verificó la reproducibilidad del 88,89 % de exactitud.
+- Se incorporaron indicadores geométricos resumidos y distribuciones exportables.
+
+### 30 de julio de 2026
+
+- Se reorganizaron código, modelos, resultados y entregables del repositorio.
+- Se consolidó PSINet como segmentador operacional y `best.pt` como alternativa.
+- Se migró la inferencia de YOLO desde Docker hacia el entorno Python local.
+- Docker quedó reservado para preparación, entrenamiento, validación y MLflow.
+- Se incorporaron pruebas automatizadas de inferencia local y estadísticas.
 
 ## 5. Estructura relevante
 
@@ -573,7 +593,7 @@ Cada overlay muestra:
 - `num_peaks`;
 - error cuando el frame no es evaluable.
 
-## 8. Módulo de percepción YOLO
+## 8. Base de percepción YOLO compartida
 
 ### 8.1 Entornos de ejecución
 
@@ -744,7 +764,66 @@ Este valor se encuentra en `prediction.class_id` dentro de
 
 El archivo PSINet está versionado como modelo principal en la rama `main`.
 
-### 8.6 Adaptador YOLO -> analítico
+#### Correspondencia con Granulometría
+
+El checkpoint principal de Cono es binariamente idéntico al utilizado por el
+proyecto de Granulometría:
+
+```text
+Cono:
+D:\Memoria\Cono\perception\models\primary\psinet_carga_visible.pt
+
+Granulometría:
+D:\Memoria\Granulometria\modelos percepcion\carga_tolva_yolo\
+haul_truck_segment_m_736_low_data_aug_07012025.pt
+```
+
+Ambos archivos tienen:
+
+```text
+tamaño: 54.829.963 bytes
+SHA256: BD7C9880D9A39B291DC03669DAD774DB9FD933D6026DF694EEE1E3A41CBF1DAB
+clases: 0=caex, 1=material
+```
+
+También existe en ambos proyectos una copia binariamente idéntica del
+checkpoint alternativo `best.pt`, con SHA256:
+
+```text
+11BF01302CABD3EAE1CFE65FDAD12B08FB1AA750493D976148CEABA9D35E336C
+```
+
+Que los pesos sean comunes no significa que exista todavía un único paquete de
+percepción compartido. Cada repositorio conserva su copia para mantener el
+pipeline encapsulado y dispone de su propio adaptador. Antes de centralizar los
+pesos o el código se deben estabilizar las rutas, el contrato de salida y las
+configuraciones de inferencia de ambos consumidores.
+
+### 8.6 Configuración específica de cada consumidor
+
+La base de percepción común se usa actualmente con parámetros distintos:
+
+| Parámetro | Cono de Carga | Granulometría |
+|---|---:|---:|
+| Checkpoint principal | mismo SHA256 PSINet | mismo SHA256 PSINet |
+| Clase de material | `1` | `1` |
+| `imgsz` predeterminado | `640` | `736` |
+| Confianza predeterminada | `0.35` | `0.25` |
+| Selección de instancias | `largest` | `union` |
+| IoU explícito | valor por defecto de Ultralytics | `0.7` |
+
+En Cono, `largest` reduce el riesgo de incorporar acopios exteriores como parte
+de la carga. El adaptador genera una máscara RGB compatible con CVAT y el
+analítico. Granulometría puede unir instancias antes de recortar, normalizar y
+dividir la carga en patches. Estas decisiones pertenecen a los consumidores de
+la percepción y deben mantenerse separadas de la identidad del checkpoint.
+
+La evaluación de 88,89 % de Cono se obtuvo con `imgsz=640`, `conf=0.35`,
+`class_id=1` y `largest`. No se deben unificar parámetros con Granulometría sin
+una comparación controlada, porque cambiarían las máscaras y la referencia
+cuantitativa vigente.
+
+### 8.7 Adaptador YOLO -> analítico
 
 Script:
 
@@ -1246,13 +1325,13 @@ El proyecto contempla:
 
 En Windows se detectó un problema al escribir imágenes en rutas con caracteres Unicode. Las funciones recientes de reportes usan `cv2.imencode(...).tofile(...)`, que soporta mejor estas rutas que `cv2.imwrite`.
 
-El Python por defecto del sistema puede no tener OpenCV. En pruebas se utilizó:
+En pruebas históricas se utilizó también:
 
 ```text
 C:\Users\azusu\anaconda3\python.exe
 ```
 
-La web app usa su propio entorno:
+El entorno operacional vigente de la web app y del pipeline completo es:
 
 ```text
 web_app\.venv
@@ -1347,7 +1426,8 @@ streamlit run web_app\app.py --server.address 127.0.0.1 --server.port 8502
 
 ## 16. Estado de validación y pruebas
 
-La validación realizada hasta ahora es principalmente experimental y visual:
+La validación realizada hasta ahora combina evaluación experimental, revisión
+visual y una suite automatizada inicial:
 
 - pruebas con máscaras manuales CVAT;
 - pruebas Data prueba 1, 2 y 3;
@@ -1357,15 +1437,17 @@ La validación realizada hasta ahora es principalmente experimental y visual:
 - matrices de confusión y exactitud por clase;
 - comparación entre dos modelos de percepción.
 
-No existe actualmente una suite propia formal de tests unitarios o de integración versionada. Esto es una deuda técnica importante, sobre todo para:
+En `tests/` existen cuatro pruebas automatizadas versionadas:
 
-- normalización de features;
-- reglas y empates;
-- detección de bordes;
-- extracción de perfil;
-- adaptación multiclase;
-- veredicto por video;
-- paths Windows/Unicode.
+- ejecución del adaptador de inferencia con el mismo Python local y sin Docker;
+- conservación de observaciones válidas en histogramas;
+- interpolación lineal de percentiles;
+- exclusión de filas inválidas de los resúmenes estadísticos.
+
+La cobertura sigue siendo parcial. Faltan pruebas unitarias o de integración
+para normalización de features, reglas y empates, detección de bordes,
+extracción de perfil, adaptación multiclase, veredicto por video y paths
+Windows/Unicode.
 
 ## 17. Estado actual y decisiones vigentes
 
@@ -1378,6 +1460,7 @@ No existe actualmente una suite propia formal de tests unitarios o de integraci�
 - Descarte si toca cualquier borde.
 - Mediciones relativas a la máscara de carga.
 - Modelo principal: PSINet con clase `material=1`.
+- El mismo checkpoint principal es la base de percepción de Granulometría.
 - Modelo alternativo: `models/alternative/best.pt` con clase `Carga=0`.
 - Mejor resultado técnico: 88,89 % en 90 imágenes.
 
@@ -1388,7 +1471,7 @@ No existe actualmente una suite propia formal de tests unitarios o de integraci�
 - Empate entre pico y área sin sesgo.
 - Calibración sobre más cámaras, iluminación y fechas.
 - Validación temporal por secuencias independientes.
-- Suite automatizada de pruebas.
+- Cobertura automatizada completa de geometría, reglas y pipeline.
 - Definición de un modelo de producción y su versionado formal.
 
 ## 18. Próximos pasos recomendados
@@ -1402,7 +1485,7 @@ Prioridad 1:
 Prioridad 2:
 
 1. Resolver explícitamente empates `0.5/0.5`.
-2. Agregar tests unitarios de reglas y geometría.
+2. Ampliar los tests unitarios de reglas y geometría.
 3. Evaluar `imgsz=960` y `1280`.
 4. Incorporar más imágenes Camera 7/8, iluminación extrema y bordes de tolva.
 5. Revisar consistencia de etiquetas CVAT en laterales y fragmentos aislados.
@@ -1422,6 +1505,8 @@ Prioridad 3:
 - No usar `merge_all` indiscriminadamente sin ROI de tolva.
 - No ejecutar el modelo principal con `class_id=0` para carga; eso selecciona `caex`.
 - No ejecutar el checkpoint alternativo con `class_id=1`; su carga es la clase 0.
+- No asumir que los parámetros de inferencia son comunes solo porque Cono y
+  Granulometría usan el mismo checkpoint.
 - No comparar la corrida errónea de clase `caex` con los resultados válidos.
 - No asumir que mAP de segmentación implica la misma exactitud del analítico.
 - No asumir que los paths guardados en CSV siguen válidos después de mover outputs.
@@ -1450,6 +1535,8 @@ Prioridad 3:
 | `perception/scripts/predict_to_analytic_masks.py` | YOLO -> máscara RGB analítica. |
 | `perception/docker-compose.yml` | Entorno GPU para entrenamiento y validación. |
 | `requirements/runtime.txt` | Dependencias de inferencia, analítico y web app. |
+| `tests/test_local_inference.py` | Verificación de inferencia local sin Docker. |
+| `tests/test_statistics.py` | Pruebas de resúmenes y distribuciones. |
 | `web_app/app.py` | Interfaz Streamlit. |
 | `web_app/src/pipeline_runner.py` | Ejecución y streaming de consola. |
 | `tools/frame_hunter_nextcloud/main.py` | Descarga y extracción desde Nextcloud. |
@@ -1463,6 +1550,12 @@ trazable, pero depende directamente de la calidad de segmentación y de
 referencias internas a la máscara. El salto de 70,0 % con el checkpoint
 alternativo a 88,89 % con el modelo principal confirma que la percepción es
 actualmente el factor más determinante.
+
+El modelo operacional de segmentación es una base común con Granulometría. La
+separación entre proyectos ocurre después de obtener la máscara: Cono construye
+descriptores geométricos internos, mientras Granulometría normaliza la carga y
+clasifica patches. Mantener explícito este límite permite compartir percepción
+sin confundir los objetivos, parámetros y evaluaciones de cada analítico.
 
 Los cambios de mayor valor son fortalecer el control de calidad de máscaras,
 resolver explícitamente los casos geométricos ambiguos y ampliar la validación a
