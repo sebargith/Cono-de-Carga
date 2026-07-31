@@ -99,3 +99,7 @@ web_app/       interfaz Streamlit encapsulada
 La documentación de entrenamiento está en
 [perception/README.md](perception/README.md), y la organización de modelos en
 [perception/models/README.md](perception/models/README.md).
+
+El manual operativo paso a paso para incorporar nuevos datos, entrenar y
+validar candidatos, promover modelos y ejecutar el sistema está en
+[`deliverables/modo_de_uso/Modo_de_uso_proyecto_cono_de_carga.docx`](deliverables/modo_de_uso/Modo_de_uso_proyecto_cono_de_carga.docx).

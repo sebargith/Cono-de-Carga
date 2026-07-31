@@ -2,6 +2,8 @@
 
 - `informe_final/`: informe de Cono de Carga, figuras y fuentes visuales.
 - `metodologia/`: documento autónomo con la metodología general del sistema.
+- `modo_de_uso/`: guía operativa para ampliar datos, entrenar candidatos y
+  ejecutar el proyecto.
 - `presentacion_psinet/`: presentación y resultados compactos de la muestra de
   1.248 imágenes.
 - `evaluacion_tecnica_90/`: métricas, resumen y comparaciones de la evaluación
