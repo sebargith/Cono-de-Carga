@@ -22,4 +22,4 @@ Descripción sugerida:
 
 Temas: `computer-vision`, `mining`, `image-segmentation`, `opencv`, `python`, `streamlit`, `geometric-analysis`, `machine-learning`.
 
-Mantener `README.md` en español y enlazar `README.en.md`. No añadir una insignia de CI aprobado sin comprobar una ejecución remota. La descripción y los temas son ajustes de GitHub: este archivo los prepara, pero no cambia metadatos remotos.
+La portada `README.md` está en inglés y enlaza la versión equivalente `README.es.md`. `README.en.md` conserva un enlace para lectores anteriores. No añadir una insignia de CI aprobado sin comprobar una ejecución remota. La descripción y los temas son ajustes de GitHub: este archivo los prepara, pero no cambia metadatos remotos.

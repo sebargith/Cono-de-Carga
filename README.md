@@ -1,62 +1,68 @@
-# Cono de Carga en CAEX
+# Haul Truck Load Shape Analysis
 
-[English](README.en.md) · [Evaluación](docs/evaluacion.md) · [Cómo ejecutarlo](docs/quickstart.md)
+[Español](README.es.md) · [Demo](#try-the-demo) · [Evaluation](docs/evaluacion.md) · [Documentation](docs/quickstart.md)
 
-Proyecto de memoria de título desarrollado en colaboración con **PSINet** para analizar la forma visible de la carga en camiones de extracción minera (CAEX). A partir de imágenes tomadas desde atrás del camión, el sistema segmenta la carga y utiliza su perfil y simetría para clasificar su orientación visual como `centrado`, `izquierda` o `derecha`. Si la máscara no permite una medición válida, devuelve `no_evaluable`.
+[![Tests](https://github.com/sebargith/Cono-de-Carga/actions/workflows/tests.yml/badge.svg)](https://github.com/sebargith/Cono-de-Carga/actions/workflows/tests.yml)
 
-Incluye procesamiento de videos, un analítico geométrico propio, estadísticas, exportación de resultados y una aplicación Streamlit. Busca facilitar la revisión de las cargas y seleccionar casos que merecen atención. **Describe la forma visible; no mide el centro de masa ni determina la estabilidad física del camión.**
+Undergraduate thesis project developed with **PSINet** to analyze the visible load shape in mining haul trucks (CAEX). A trained segmentation model extracts the load from rear-view images. A custom geometric analytic uses its upper profile and area symmetry to classify the visible orientation as centered, left or right. Invalid cases receive `no_evaluable`.
 
-![Máscara, perfil, ápice y referencia interna de la carga](deliverables/informe_final/figuras/Figura_C5_elementos_geometricos.jpg)
+The system includes local video processing, video summaries, CSV/JSON outputs and a Streamlit review application. **It does not measure the center of mass or determine physical truck stability.**
 
-*Las posiciones se calculan respecto de la propia máscara, no respecto de una referencia externa de la tolva.*
+## Visual example
 
-## Mi participación
+![Load mask, profile, apex and internal reference](deliverables/informe_final/figuras/Figura_C5_elementos_geometricos.jpg)
 
-Desarrollé el proyecto desde la preparación de datos hasta la implementación y evaluación del sistema. Mi trabajo incluyó el etiquetado, el entrenamiento del modelo de segmentación, el diseño del analítico geométrico, el procesamiento de videos y la aplicación de visualización. Las decisiones y las etiquetas de referencia se revisaron junto al equipo de ingenieros de PSINet.
+*Positions use the load mask itself as a reference, not an independently detected truck bed.*
 
-El aporte central es convertir la máscara en medidas interpretables y reglas configurables, y reunir los resultados por imagen y video. El modelo entrenado de segmentación constituye la base de percepción; no produce por sí solo la clasificación del cono.
+## Results
 
-## Resultados
+Evaluation on **90 images**, with 30 references per class:
 
-Evaluación del analítico sobre **90 imágenes**, con 30 referencias por clase:
-
-| Indicador | Resultado |
+| Metric | Result |
 | --- | --- |
-| Exactitud global | **88,89 % — 80/90** |
-| Centrado: referencias correctamente identificadas | 73,33 % — 22/30 |
-| Izquierda: referencias correctamente identificadas | 93,33 % — 28/30 |
-| Derecha: referencias correctamente identificadas | 100 % — 30/30 |
-| Imágenes evaluables en esta muestra | 100 % — 90/90 |
+| Overall accuracy | **88.89% — 80/90** |
+| Centered recall | 73.33% — 22/30 |
+| Left recall | 93.33% — 28/30 |
+| Right recall | 100% — 30/30 |
+| Evaluable images in this set | 100% — 90/90 |
 
-Los porcentajes por clase son *recall*: de las imágenes que pertenecen a esa clase, cuántas se reconocieron correctamente. Que todas fueran evaluables no significa que todas fueran correctas. Ocho de los diez errores corresponden a cargas centradas clasificadas hacia un lado.
-
-| Referencia ↓ / Predicción → | Centrado | Izquierda | Derecha |
+| Reference ↓ / Prediction → | Centered | Left | Right |
 | --- | ---: | ---: | ---: |
-| Centrado | 22 | 6 | 2 |
-| Izquierda | 2 | 28 | 0 |
-| Derecha | 0 | 0 | 30 |
+| Centered | 22 | 6 | 2 |
+| Left | 2 | 28 | 0 |
+| Right | 0 | 0 | 30 |
 
-Estos resultados describen la muestra evaluada, no el rendimiento garantizado en otras cámaras o minas. Los ajustes de sensibilidad se realizaron en varias pruebas; las 90 imágenes se utilizaron para reportar el rendimiento del analítico. [Protocolo, límites y resultados originales](docs/evaluacion.md).
+Eight of ten errors are centered examples classified toward one side. Evaluable coverage is not accuracy. Sensitivity was adjusted through several trials; the 90-image set reports analytic performance. Results do not establish generalization to other cameras or mines. [Protocol](docs/evaluacion.md) · [Original JSON](deliverables/evaluacion_tecnica_90/resumen/resumen_evaluacion.json).
 
-## Cómo funciona
+## My contribution
 
-```text
-Video local → fotogramas → modelo de segmentación → máscara de carga
-           → limpieza y geometría → clasificación por imagen
-           → resumen por video → aplicación, CSV, JSON y visualizaciones
+I developed the project from data preparation through implementation and evaluation: labeling, segmentation model training, geometric feature extraction and decision rules, video processing, and the review application. Decisions and reference labels were reviewed with PSINet's engineering team.
+
+The key contribution is the analytic built on top of segmentation: interpretable measurements, configurable rules and traceable results. The segmentation model alone does not classify load orientation.
+
+## How it works
+
+```mermaid
+flowchart LR
+    A["Video / frames"] --> B["Load segmentation"]
+    B["Load segmentation"] --> C["Mask cleanup"]
+    C["Mask cleanup"] --> D["Profile and symmetry"]
+    D["Profile and symmetry"] --> E["Geometric rules"]
+    E["Geometric rules"] --> F["Image / video results"]
 ```
 
-La geometría incluye perfil superior, ápice, simetría de área y centroide. Las reglas utilizan la posición del ápice y la simetría para clasificar; el centroide y la irregularidad quedan como apoyo. Cada resultado puede relacionarse con su imagen y sus indicadores.
 
-![Vista ilustrativa de la aplicación de revisión](deliverables/informe_final/figuras/Figura_C7_web_app.jpg)
+The analytic measures the upper profile, apex, area symmetry and centroid. Classification uses relative apex position and area symmetry; other descriptors support inspection. Measurements use the load mask itself as their reference, not an independently detected truck bed.
 
-*Figura ilustrativa elaborada para el informe, no una captura de una ejecución única. Los valores mostrados no constituyen un benchmark de velocidad.*
+![Illustrative view of the review application](deliverables/informe_final/figuras/Figura_C7_web_app.jpg)
 
-Tecnologías: Python, OpenCV, NumPy, SciPy, YOLO para segmentación, PyTorch, Streamlit, Docker y MLflow. Docker y MLflow se utilizan en entrenamiento; no son necesarios para la demo geométrica.
+*Illustration prepared for the report, not a screenshot of a single run. Displayed values are not a speed benchmark.*
 
-## Probar sin GPU ni datos de la mina
+Stack: Python, OpenCV, NumPy, SciPy, YOLO segmentation, PyTorch, Streamlit, Docker and MLflow. Docker and MLflow belong to training, not the lightweight demo.
 
-La demo crea cuatro máscaras sintéticas y ejecuta la limpieza, el cálculo geométrico y las reglas reales del proyecto. **No ejecuta segmentación ni reproduce la evaluación de 90 imágenes.** Usar Python 3.12:
+## Try the demo
+
+Requires Python 3.12. No weights, operational images, Torch or GPU:
 
 ```powershell
 git clone https://github.com/sebargith/Cono-de-Carga.git
@@ -68,35 +74,37 @@ python scripts/demo_synthetic.py
 python -m unittest discover -s tests -v
 ```
 
-En Linux/macOS, sustituir la activación por `source .venv-demo/bin/activate`. El alcance de las comprobaciones se detalla en la [guía](docs/quickstart.md).
+On Linux/macOS, use `source .venv-demo/bin/activate`. Four synthetic masks exercise actual cleanup, geometry and rules. Expected outputs: left, centered, right and non-evaluable. PNGs and `results.csv` are saved in `outputs/demo_synthetic/`. Use a new `--output-dir` to rerun without overwriting results.
 
-Se generan cuatro PNG y `results.csv` en `outputs/demo_synthetic/`, con izquierda, centrado, derecha y no evaluable. Para repetir, indicar una carpeta nueva con `--output-dir`; no se sobrescriben resultados existentes.
+**This is a software demo, not segmentation inference or reproduction of the 90-image evaluation.** The [guide](docs/quickstart.md) covers full video inference, existing-mask analysis and verification scope. The full runtime currently targets CUDA and requires weights and video inputs.
 
-## Ejecutar el flujo completo
+## Code and documentation
 
-La [guía](docs/quickstart.md) separa demo, análisis con máscaras existentes y procesamiento de videos con el modelo. Este último necesita pesos, videos y el entorno de inferencia; las dependencias actuales utilizan CUDA.
-
-En Windows, `Abrir web app Cono de Carga.bat` inicia la interfaz y prepara su entorno. La primera instalación puede tardar varios minutos. Más detalles en [pipeline de videos](docs/pipeline_videos_locales.md) y [entrenamiento](perception/README.md).
-
-## Alcances y limitaciones
-
-- La referencia es la propia carga visible. No se estima volumen, masa ni desplazamiento físico respecto de la tolva.
-- Una máscara incorrecta puede afectar las medidas. Las comprobaciones no detectan todos los errores de segmentación.
-- El empate de votos por imagen favorece izquierda. Algunas contradicciones entre medianas por video también favorecen izquierda. Son comportamientos existentes, documentados y cubiertos por pruebas; no se han alterado las reglas ni los resultados publicados.
-- La evaluación es por imagen: no valida por sí sola el veredicto por video ni beneficios operativos en terreno.
-- Se procesan archivos locales; no se presenta como servicio en producción ni solución en tiempo real.
-
-## Código y documentación
-
-| Ruta | Contenido |
+| Component | Entry point |
 | --- | --- |
-| `src/cone_load/` | Limpieza, perfiles, variables, reglas y visualizaciones |
-| `configs/analytic_config.yaml` | Parámetros del analítico |
-| `scripts/` y `tests/` | Ejecución, evaluación y pruebas |
-| `web_app/` | Aplicación Streamlit |
-| `perception/` | Segmentación y entrenamiento |
-| `deliverables/` | Resultados e informes existentes |
+| Cleanup, profiles, geometry and rules | [`src/cone_load/`](src/cone_load/) |
+| Analytic parameters | [`configs/analytic_config.yaml`](configs/analytic_config.yaml) |
+| Execution and evaluation | [`scripts/`](scripts/) |
+| Automated checks | [`tests/`](tests/) |
+| Review application | [`web_app/`](web_app/) |
+| Segmentation and training | [`perception/`](perception/) |
 
-[Arquitectura](docs/arquitectura_pipeline.md) · [Evaluación](docs/evaluacion.md) · [Revisión de publicación](docs/publicacion.md)
+[Architecture](docs/arquitectura_pipeline.md) · [Evaluation](docs/evaluacion.md) · [Publication review](docs/publicacion.md)
 
-Los datos y documentos de la empresa no se consideran de libre redistribución por aparecer en el repositorio. La revisión de permisos es independiente; la demo sintética no utiliza ese material.
+## Limitations and next step
+
+- Visible shape is not load mass, volume, physical balance or truck stability.
+- Segmentation errors can propagate; checks cannot detect every incorrect mask.
+- Tied image votes and some conflicting video medians favor left. Tests characterize existing behavior without changing published results.
+- Image accuracy does not establish video accuracy or operational benefit.
+- Processing is offline, not a production or real-time service.
+
+Tests cover geometry, invalid masks, cleanup, thresholds, conflicting signals, video aggregation, statistics and demo outputs. GitHub Actions is configured for CPU checks on Windows and Ubuntu; a local pass does not mean the remote workflow has run.
+
+Next step: evaluate new videos and capture conditions, and assess the effect of alternative tie-breaking rules before changing the analytic.
+
+## Project context and publication
+
+Developed as an undergraduate thesis in collaboration with PSINet. [Visual Granulometry](https://github.com/sebargith/Granulometria-Tolva) is the companion project: both use one trained segmentation model, but run separate analytic branches with their own configurations. Cono describes shape; Granulometry describes surface composition. Their performance figures measure different tasks and should not be ranked against each other.
+
+Corporate artifacts require separate publication permission. The synthetic demo uses no mine data. [Publication review](docs/publicacion.md).
